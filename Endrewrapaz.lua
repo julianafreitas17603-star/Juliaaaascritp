@@ -1,5 +1,5 @@
 -- ==========================================================
---  💀 PAINEL PRO v3.0 — Aim + Speed + ESP + Noclip + Voo + Fullbright + Config
+--  💀 PAINEL PRO v3.0 — Aim + Speed + ESP + Noclip + Voo + Fullbright + TP + Config
 -- ==========================================================
 
 repeat task.wait(0.1) until game:IsLoaded()
@@ -184,7 +184,7 @@ make("TextLabel", {
 make("TextLabel", {
     BackgroundTransparency = 1, Position = UDim2.fromOffset(60, 31),
     Size = UDim2.new(1, -120, 0, 16),
-    Text = "Aim • Speed • ESP • Noclip • Voo • Fullbright", TextColor3 = THEME.SubText, TextSize = 12,
+    Text = "Aim • Speed • ESP • Noclip • Voo • Fullbright • TP", TextColor3 = THEME.SubText, TextSize = 12,
     Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left,
 }, top)
 
@@ -350,6 +350,15 @@ local function card(parent, height)
     round(c, 12)
     stroke(c, THEME.White, 1, 0.86)
     return c
+end
+
+local function makeListHolder(parent)
+    local h = make("Frame", {
+        Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1,
+        LayoutOrder = order(), AutomaticSize = Enum.AutomaticSize.Y,
+    }, parent)
+    make("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, h)
+    return h
 end
 
 local function addToggle(parent, label, default, callback)
@@ -935,30 +944,20 @@ local FullbrightBackup  = nil
 
 local function SaveOriginalLighting()
     FullbrightBackup = {
-        Ambient          = Lighting.Ambient,
-        OutdoorAmbient   = Lighting.OutdoorAmbient,
-        Brightness       = Lighting.Brightness,
-        ClockTime        = Lighting.ClockTime,
-        FogEnd           = Lighting.FogEnd,
-        FogStart         = Lighting.FogStart,
-        FogColor         = Lighting.FogColor,
-        GlobalShadows    = Lighting.GlobalShadows,
-        EnvironmentDiffuseScale  = Lighting.EnvironmentDiffuseScale,
+        Ambient = Lighting.Ambient, OutdoorAmbient = Lighting.OutdoorAmbient,
+        Brightness = Lighting.Brightness, ClockTime = Lighting.ClockTime,
+        FogEnd = Lighting.FogEnd, FogStart = Lighting.FogStart, FogColor = Lighting.FogColor,
+        GlobalShadows = Lighting.GlobalShadows,
+        EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
         EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale,
         ExposureCompensation = Lighting.ExposureCompensation,
         Effects = {},
     }
     for _, e in ipairs(Lighting:GetChildren()) do
         if e:IsA("Atmosphere") then
-            FullbrightBackup.Effects[e] = {
-                Density = e.Density, Haze = e.Haze, Glare = e.Glare,
-                Color = e.Color, Decay = e.Decay,
-            }
+            FullbrightBackup.Effects[e] = { Density = e.Density, Haze = e.Haze, Glare = e.Glare, Color = e.Color, Decay = e.Decay }
         elseif e:IsA("ColorCorrectionEffect") then
-            FullbrightBackup.Effects[e] = {
-                Brightness = e.Brightness, Contrast = e.Contrast,
-                Saturation = e.Saturation, TintColor = e.TintColor,
-            }
+            FullbrightBackup.Effects[e] = { Brightness = e.Brightness, Contrast = e.Contrast, Saturation = e.Saturation, TintColor = e.TintColor }
         elseif e:IsA("BloomEffect") then
             FullbrightBackup.Effects[e] = { Intensity = e.Intensity }
         elseif e:IsA("BlurEffect") then
@@ -971,14 +970,14 @@ end
 
 local function FullbrightApply()
     if not FullbrightBackup then SaveOriginalLighting() end
-    Lighting.Ambient        = Color3.fromRGB(130, 130, 130)
+    Lighting.Ambient = Color3.fromRGB(130, 130, 130)
     Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 140)
-    Lighting.Brightness     = 2
-    Lighting.ClockTime      = 14
-    Lighting.FogEnd         = 100000
-    Lighting.FogStart       = 100000
-    Lighting.GlobalShadows  = true
-    Lighting.EnvironmentDiffuseScale  = 0.5
+    Lighting.Brightness = 2
+    Lighting.ClockTime = 14
+    Lighting.FogEnd = 100000
+    Lighting.FogStart = 100000
+    Lighting.GlobalShadows = true
+    Lighting.EnvironmentDiffuseScale = 0.5
     Lighting.EnvironmentSpecularScale = 0.5
     Lighting.ExposureCompensation = 0
     for _, ef in ipairs(Lighting:GetChildren()) do
@@ -1005,9 +1004,7 @@ local function FullbrightStart()
     FullbrightConns = {}
     table.insert(FullbrightConns, Lighting:GetPropertyChangedSignal("ClockTime"):Connect(function()
         if not FullbrightEnabled then return end
-        if Lighting.ClockTime < 10 or Lighting.ClockTime > 17 then
-            Lighting.ClockTime = 14
-        end
+        if Lighting.ClockTime < 10 or Lighting.ClockTime > 17 then Lighting.ClockTime = 14 end
     end))
     table.insert(FullbrightConns, Lighting:GetPropertyChangedSignal("Brightness"):Connect(function()
         if not FullbrightEnabled then return end
@@ -1033,22 +1030,20 @@ local function FullbrightStop()
     end
     FullbrightConns = {}
     if FullbrightBackup then
-        Lighting.Ambient        = FullbrightBackup.Ambient
+        Lighting.Ambient = FullbrightBackup.Ambient
         Lighting.OutdoorAmbient = FullbrightBackup.OutdoorAmbient
-        Lighting.Brightness     = FullbrightBackup.Brightness
-        Lighting.ClockTime      = FullbrightBackup.ClockTime
-        Lighting.FogEnd         = FullbrightBackup.FogEnd
-        Lighting.FogStart       = FullbrightBackup.FogStart
-        Lighting.FogColor       = FullbrightBackup.FogColor
-        Lighting.GlobalShadows  = FullbrightBackup.GlobalShadows
-        Lighting.EnvironmentDiffuseScale  = FullbrightBackup.EnvironmentDiffuseScale
+        Lighting.Brightness = FullbrightBackup.Brightness
+        Lighting.ClockTime = FullbrightBackup.ClockTime
+        Lighting.FogEnd = FullbrightBackup.FogEnd
+        Lighting.FogStart = FullbrightBackup.FogStart
+        Lighting.FogColor = FullbrightBackup.FogColor
+        Lighting.GlobalShadows = FullbrightBackup.GlobalShadows
+        Lighting.EnvironmentDiffuseScale = FullbrightBackup.EnvironmentDiffuseScale
         Lighting.EnvironmentSpecularScale = FullbrightBackup.EnvironmentSpecularScale
         Lighting.ExposureCompensation = FullbrightBackup.ExposureCompensation
         for ef, vals in pairs(FullbrightBackup.Effects) do
             if ef and ef.Parent then
-                for k, v in pairs(vals) do
-                    pcall(function() ef[k] = v end)
-                end
+                for k, v in pairs(vals) do pcall(function() ef[k] = v end) end
             end
         end
         FullbrightBackup = nil
@@ -1243,6 +1238,22 @@ Players.PlayerAdded:Connect(hookPlayer)
 Players.PlayerRemoving:Connect(function(p) clearESP(p) end)
 
 -- ==========================================================
+--  📍 SISTEMA DE TP
+-- ==========================================================
+local TPPoints = {}
+
+local function TeleportTo(pos)
+    local c = player.Character
+    local r = c and c:FindFirstChild("HumanoidRootPart")
+    if not r then return false end
+    pcall(function()
+        r.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
+        r.Velocity = Vector3.new(0, 0, 0)
+    end)
+    return true
+end
+
+-- ==========================================================
 --  🎯 ABA AIM
 -- ==========================================================
 local aimTab = newTab("Aim", "🎯", 1)
@@ -1268,20 +1279,10 @@ addSlider(aimTab, "Velocidade da bala", 50, 3000, 400, function(v) ACONFIG.Predi
 addSlider(aimTab, "Suavidade (0 = colado)", 0, 1, 0, function(v) ACONFIG.Smoothness = v end, 2)
 
 text(aimTab, "🧠 IA DE TROCA", 12, THEME.SubText, Enum.Font.GothamBold)
-addSlider(aimTab, "Velocidade de troca (ms)", 30, 500, 80, function(v)
-    ACONFIG.SwitchCooldown = v / 1000
-end)
-addSlider(aimTab, "Margem p/ trocar (studs)", 0, 30, 3, function(v)
-    ACONFIG.SwitchMargin = v
-end)
-addSlider(aimTab, "Peso da distância", 0.1, 5, 1.0, function(v)
-    ACONFIG.WeightDistance = v
-end, 1)
-addSlider(aimTab, "Peso do ângulo", 0, 3, 0.35, function(v)
-    ACONFIG.WeightAngle = v
-end, 2)
-
-text(aimTab, "💡 IA ON = sempre troca pro mais próximo.\n⚡ Margem baixa (0-2) = troca mais agressivo.\n⚡ Velocidade baixa (30-80ms) = reage rápido.", 12, Color3.fromRGB(250, 204, 21))
+addSlider(aimTab, "Velocidade de troca (ms)", 30, 500, 80, function(v) ACONFIG.SwitchCooldown = v / 1000 end)
+addSlider(aimTab, "Margem p/ trocar (studs)", 0, 30, 3, function(v) ACONFIG.SwitchMargin = v end)
+addSlider(aimTab, "Peso da distância", 0.1, 5, 1.0, function(v) ACONFIG.WeightDistance = v end, 1)
+addSlider(aimTab, "Peso do ângulo", 0, 3, 0.35, function(v) ACONFIG.WeightAngle = v end, 2)
 
 -- ==========================================================
 --  ⚡ ABA SPEED
@@ -1304,7 +1305,6 @@ addToggle(spdTab, "⚡ Ativar Speed personalizado", false, function(v)
     end
     notify(v and "⚡ Speed ON" or "Speed OFF")
 end)
--- ✅ VELOCIDADE ATÉ 1000
 addSlider(spdTab, "Velocidade (WalkSpeed)", 16, 1000, 16, function(v)
     ConfigState.SpeedValue = v
     if ConfigState.SpeedEnabled then
@@ -1352,8 +1352,6 @@ addSlider(spdTab, "FOV da câmera", 40, 120, 70, function(v)
         Camera.FieldOfView = v
     end
 end)
-
-text(spdTab, "💡 Speed e Pulo ficam travados. Só desliga no toggle.\n💡 FOV reaplica sozinho se o jogo resetar.\n⚠️ Velocidade alta (>500) pode dar kick.", 12, Color3.fromRGB(250, 204, 21))
 
 -- ==========================================================
 --  👁️ ABA ESP
@@ -1410,8 +1408,6 @@ for i, preset in ipairs(ESP_COLORS) do
 end
 colorStrokes[1].Transparency = 0
 
-text(espTab, "💡 Escolha uma cor acima. Aplica na hora nos inimigos.", 12, Color3.fromRGB(250, 204, 21))
-
 -- ==========================================================
 --  🧱 ABA NOCLIP
 -- ==========================================================
@@ -1431,8 +1427,6 @@ addToggle(noclipTab, "🧱 Ativar Noclip", false, function(v)
     end
 end)
 
-text(noclipTab, "💡 Fica ativo até desligar no toggle.\n💡 Sobrevive ao respawn automaticamente.", 12, Color3.fromRGB(250, 204, 21))
-
 -- ==========================================================
 --  🚀 ABA VOO
 -- ==========================================================
@@ -1449,10 +1443,7 @@ addToggle(vooTab, "🚀 Ativar Voo", false, function(v)
         notify("🚀 Voo OFF")
     end
 end)
--- ✅ VELOCIDADE DO VOO ATÉ 800
 addSlider(vooTab, "Velocidade do Voo", 20, 800, 60, function(v) FlySpeed = v end)
-
-text(vooTab, "💡 Olhe pra cima + ande = SOBE.\n💡 Olhe pra baixo + ande = DESCE.\n💡 Sobrevive ao respawn automaticamente.", 12, Color3.fromRGB(250, 204, 21))
 
 -- ==========================================================
 --  🔦 ABA FULLBRIGHT
@@ -1472,12 +1463,123 @@ addToggle(fullTab, "🔦 Ativar Fullbright", false, function(v)
     end
 end)
 
-text(fullTab, "💡 Ajusta luz, sombras e remove efeitos escuros.\n💡 Restaura tudo ao desligar.", 12, Color3.fromRGB(250, 204, 21))
+-- ==========================================================
+--  📍 ABA TP — PONTOS SALVOS
+-- ==========================================================
+local tpTab = newTab("TP", "📍", 7)
+text(tpTab, "Teleportes", 20, THEME.Text, Enum.Font.GothamBold)
+text(tpTab, "Salve pontos e volte pra eles quando quiser.", 12, THEME.SubText)
+
+addButton(tpTab, "📍 Salvar Posição Atual", true, function()
+    local c = player.Character
+    local r = c and c:FindFirstChild("HumanoidRootPart")
+    if not r then return end
+    local idx = #TPPoints + 1
+    table.insert(TPPoints, {
+        name = "Ponto " .. idx .. " (" .. math.floor(r.Position.X) .. ", " .. math.floor(r.Position.Z) .. ")",
+        pos  = r.Position,
+    })
+    if _G.RefreshTPList then _G.RefreshTPList() end
+    notify("📍 Ponto " .. idx .. " salvo!")
+end)
+
+local savedHeader = make("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 26),
+    BackgroundColor3 = THEME.Off,
+    BackgroundTransparency = 0.4,
+    Text = "📍 Pontos salvos: 0",
+    TextColor3 = THEME.SubText,
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    LayoutOrder = order(),
+}, tpTab)
+round(savedHeader, 8)
+
+local savedHolder = makeListHolder(tpTab)
+
+_G.RefreshTPList = function()
+    for _, ch in ipairs(savedHolder:GetChildren()) do
+        if not ch:IsA("UIListLayout") then ch:Destroy() end
+    end
+    savedHeader.Text = "📍 Pontos salvos: " .. #TPPoints
+
+    if #TPPoints == 0 then
+        local empty = make("TextLabel", {
+            Size = UDim2.new(1, 0, 0, 30),
+            BackgroundColor3 = THEME.Off,
+            BackgroundTransparency = 0.6,
+            Text = "Nenhum ponto salvo ainda",
+            TextColor3 = THEME.SubText,
+            Font = Enum.Font.Gotham,
+            TextSize = 12,
+        }, savedHolder)
+        round(empty, 8)
+    else
+        for i, p in ipairs(TPPoints) do
+            local row = make("Frame", {
+                Size = UDim2.new(1, 0, 0, 38),
+                BackgroundColor3 = THEME.Card,
+                LayoutOrder = i,
+            }, savedHolder)
+            round(row, 10)
+            stroke(row, THEME.White, 1, 0.85)
+
+            local lbl = make("TextLabel", {
+                Size = UDim2.new(1, -110, 1, 0),
+                Position = UDim2.fromOffset(12, 0),
+                BackgroundTransparency = 1,
+                Text = p.name,
+                TextColor3 = THEME.Text,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Font = Enum.Font.GothamMedium,
+                TextSize = 12,
+                TextTruncate = Enum.TextTruncate.AtEnd,
+            }, row)
+
+            local irBtn = make("TextButton", {
+                Size = UDim2.fromOffset(50, 26),
+                Position = UDim2.new(1, -96, 0.5, -13),
+                BackgroundColor3 = THEME.Accent,
+                Text = "IR",
+                TextColor3 = THEME.White,
+                Font = Enum.Font.GothamBold,
+                TextSize = 12,
+                AutoButtonColor = false,
+            }, row)
+            round(irBtn, 6)
+            themed(function() irBtn.BackgroundColor3 = THEME.Accent end)
+            irBtn.Activated:Connect(function()
+                TeleportTo(p.pos)
+                notify("📍 TP feito!")
+            end)
+
+            local delBtn = make("TextButton", {
+                Size = UDim2.fromOffset(34, 26),
+                Position = UDim2.new(1, -40, 0.5, -13),
+                BackgroundColor3 = THEME.Danger,
+                Text = "X",
+                TextColor3 = THEME.White,
+                Font = Enum.Font.GothamBold,
+                TextSize = 12,
+                AutoButtonColor = false,
+            }, row)
+            round(delBtn, 6)
+            delBtn.Activated:Connect(function()
+                table.remove(TPPoints, i)
+                _G.RefreshTPList()
+                notify("Ponto removido")
+            end)
+        end
+    end
+end
+_G.RefreshTPList()
+
+text(tpTab, "💡 Salve a posição, dê um nome mental e clique em IR pra voltar.\n⚠️ Pontos são apagados ao reiniciar o script.", 12, Color3.fromRGB(250, 204, 21))
 
 -- ==========================================================
 --  ⚙️ ABA CONFIG
 -- ==========================================================
-local cfgTab = newTab("Config", "⚙️", 7)
+local cfgTab = newTab("Config", "⚙️", 8)
 text(cfgTab, "Config", 20, THEME.Text, Enum.Font.GothamBold)
 text(cfgTab, "Personalize o painel do seu jeito.", 12, THEME.SubText)
 
@@ -1558,8 +1660,6 @@ addButton(cfgTab, "🔄 Resetar personalização", true, function()
     end
     notify("Personalização resetada")
 end)
-
-text(cfgTab, "💡 Ajuste do seu jeito. Tudo em tempo real.", 12, Color3.fromRGB(250, 204, 21))
 
 selectTab("Aim")
 
@@ -1702,4 +1802,4 @@ end)
 ESPRefreshPlayers()
 openWindow()
 
-print("✅ Painel Pro v3.0 — 7 abas (Aim, Speed, ESP, Noclip, Voo, Fullbright, Config) carregado")
+print("✅ Painel Pro v3.0 — 8 abas (Aim, Speed, ESP, Noclip, Voo, Fullbright, TP, Config) carregado")
