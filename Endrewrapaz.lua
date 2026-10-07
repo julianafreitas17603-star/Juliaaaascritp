@@ -1,6 +1,7 @@
 -- ==========================================================
 --  💀 PAINEL PRO v3.0 — Aim + Speed + ESP + Noclip + Voo + Fullbright + TP + Config
 --  🎮 Tecla J abre/fecha + mouse livre + clique corrigido
+--  ✅ Painel inicia fechado (aperta J pra abrir)
 -- ==========================================================
 
 repeat task.wait(0.1) until game:IsLoaded()
@@ -1744,7 +1745,7 @@ local function openWindow()
     root.Visible = true
     anim.Scale = 0.7
     tween(anim, { Scale = 1 }, 0.55, Enum.EasingStyle.Back)
-    unlockMouse() -- ✅ mouse fica livre
+    unlockMouse()
     task.delay(0.55, function() busy = false end)
 end
 
@@ -1756,7 +1757,7 @@ local function minimizeWindow()
         root.Visible = false
         showBubble(true)
         busy = false
-        lockMouse() -- ✅ mouse volta a travar
+        lockMouse()
     end)
 end
 
@@ -1774,7 +1775,7 @@ connect(gui:GetPropertyChangedSignal("AbsoluteSize"), function()
     bubble.Position = clampPos(bubble.Position.X.Offset, bubble.Position.Y.Offset)
 end)
 
--- ✅ BLOCO CORRIGIDO — clique só abre se for na bolinha
+-- ✅ BLOCO DA BOLINHA CORRIGIDO
 do
     local function snapToSide()
         local vp = gui.AbsoluteSize
@@ -1821,8 +1822,8 @@ do
         end
     end)
 
-    -- ✅ Activated só dispara quando o clique começou E terminou na bolinha
-    hit.Activated:Connect(function()
+    -- ✅ MouseButton1Click só dispara se clicou NA bolinha
+    hit.MouseButton1Click:Connect(function()
         if justDragged then
             justDragged = false
             return
@@ -1831,9 +1832,9 @@ do
     end)
 end
 
--- ✅ J OU RightShift abre/fecha
+-- ✅ Tecla J/RightShift — sem o "processed" que estava bloqueando
 connect(UserInputService.InputBegan, function(input, processed)
-    if processed then return end
+    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
     if input.KeyCode == Enum.KeyCode.J or input.KeyCode == Enum.KeyCode.RightShift then
         if isOpen then minimizeWindow() else openWindow() end
     end
@@ -1847,7 +1848,9 @@ player.CharacterAdded:Connect(function()
 end)
 
 ESPRefreshPlayers()
-openWindow()
+
+-- ✅ Painel começa FECHADO — só abre quando aperta J ou clica na bolinha
+showBubble(true)
 
 print("✅ Painel Pro v3.0 — 8 abas (Aim, Speed, ESP, Noclip, Voo, Fullbright, TP, Config)")
-print("🎮 Tecla J ou RightShift abre/fecha o painel")
+print("🎮 Aperta J ou RightShift pra abrir o painel")
