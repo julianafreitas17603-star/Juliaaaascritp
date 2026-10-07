@@ -1,5 +1,6 @@
 -- ==========================================================
 --  💀 PAINEL PRO v3.0 — Aim + Speed + ESP + Noclip + Voo + Fullbright + TP + Config
+--  🎮 Tecla J abre/fecha + mouse livre + clique corrigido
 -- ==========================================================
 
 repeat task.wait(0.1) until game:IsLoaded()
@@ -1701,6 +1702,28 @@ local hit = make("TextButton", {
 
 local isOpen, busy = false, false
 
+-- ✅ CONTROLE DO MOUSE
+local savedMouseBehavior = nil
+local savedMouseIcon = nil
+
+local function unlockMouse()
+    pcall(function()
+        savedMouseBehavior = UserInputService.MouseBehavior
+        savedMouseIcon = UserInputService.MouseIconEnabled
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+        UserInputService.MouseIconEnabled = true
+    end)
+end
+
+local function lockMouse()
+    pcall(function()
+        UserInputService.MouseBehavior = savedMouseBehavior or Enum.MouseBehavior.LockCenter
+        if savedMouseIcon ~= nil then
+            UserInputService.MouseIconEnabled = savedMouseIcon
+        end
+    end)
+end
+
 local function showBubble(show)
     if show then
         bubble.Visible = true
@@ -1721,6 +1744,7 @@ local function openWindow()
     root.Visible = true
     anim.Scale = 0.7
     tween(anim, { Scale = 1 }, 0.55, Enum.EasingStyle.Back)
+    unlockMouse() -- ✅ mouse fica livre
     task.delay(0.55, function() busy = false end)
 end
 
@@ -1732,6 +1756,7 @@ local function minimizeWindow()
         root.Visible = false
         showBubble(true)
         busy = false
+        lockMouse() -- ✅ mouse volta a travar
     end)
 end
 
@@ -1749,6 +1774,7 @@ connect(gui:GetPropertyChangedSignal("AbsoluteSize"), function()
     bubble.Position = clampPos(bubble.Position.X.Offset, bubble.Position.Y.Offset)
 end)
 
+-- ✅ BLOCO CORRIGIDO — clique só abre se for na bolinha
 do
     local function snapToSide()
         local vp = gui.AbsoluteSize
@@ -1756,38 +1782,59 @@ do
         local target = (x + BUBBLE / 2 < vp.X / 2) and 10 or (vp.X - BUBBLE - 10)
         tween(bubble, { Position = UDim2.fromOffset(target, bubble.Position.Y.Offset) }, 0.45, Enum.EasingStyle.Back)
     end
+
     local pressing, moved, startMouse, startPos = false, false, nil, nil
+    local justDragged = false
 
     hit.InputBegan:Connect(function(input)
         if isPointer(input) then
-            pressing, moved = true, false
+            pressing = true
+            moved = false
+            justDragged = false
             startMouse = input.Position
             startPos = bubble.Position
             tween(bubbleScale, { Scale = 0.9 }, 0.1)
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    pressing = false
-                    tween(bubbleScale, { Scale = 1 }, 0.25, Enum.EasingStyle.Back)
-                    if moved then snapToSide() else openWindow() end
-                end
-            end)
         end
     end)
 
     connect(UserInputService.InputChanged, function(input)
         if pressing and isMove(input) then
             local d = input.Position - startMouse
-            if not moved and d.Magnitude > 8 then moved = true end
+            if not moved and d.Magnitude > 8 then
+                moved = true
+                justDragged = true
+            end
             if moved then
                 bubble.Position = clampPos(startPos.X.Offset + d.X, startPos.Y.Offset + d.Y)
             end
         end
     end)
+
+    connect(UserInputService.InputEnded, function(input)
+        if not pressing then return end
+        if not isPointer(input) then return end
+        pressing = false
+        tween(bubbleScale, { Scale = 1 }, 0.25, Enum.EasingStyle.Back)
+        if moved then
+            snapToSide()
+            task.delay(0.1, function() justDragged = false end)
+        end
+    end)
+
+    -- ✅ Activated só dispara quando o clique começou E terminou na bolinha
+    hit.Activated:Connect(function()
+        if justDragged then
+            justDragged = false
+            return
+        end
+        openWindow()
+    end)
 end
 
+-- ✅ J OU RightShift abre/fecha
 connect(UserInputService.InputBegan, function(input, processed)
     if processed then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
+    if input.KeyCode == Enum.KeyCode.J or input.KeyCode == Enum.KeyCode.RightShift then
         if isOpen then minimizeWindow() else openWindow() end
     end
 end)
@@ -1802,4 +1849,5 @@ end)
 ESPRefreshPlayers()
 openWindow()
 
-print("✅ Painel Pro v3.0 — 8 abas (Aim, Speed, ESP, Noclip, Voo, Fullbright, TP, Config) carregado")
+print("✅ Painel Pro v3.0 — 8 abas (Aim, Speed, ESP, Noclip, Voo, Fullbright, TP, Config)")
+print("🎮 Tecla J ou RightShift abre/fecha o painel")
