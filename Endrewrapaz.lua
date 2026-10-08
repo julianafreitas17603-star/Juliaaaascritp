@@ -1,7 +1,7 @@
 -- ==========================================================
---  💀 PAINEL PRO v3.0 — Aim + Speed + ESP + Noclip + Voo + Fullbright + TP + Config
---  🎮 Tecla J abre/fecha + mouse livre + clique corrigido
---  ✅ Painel inicia fechado (aperta J pra abrir)
+--  💀 PAINEL PRO v3.0 — Aim + Speed + ESP + Noclip + Voo + Fullbright + TP + Auto Click FORTE + Config
+--  🖱️ Auto Click ativo SÓ enquanto segura o mouse / toque na tela
+--  🔥 Modo FORTE com CPS alto
 -- ==========================================================
 
 repeat task.wait(0.1) until game:IsLoaded()
@@ -12,6 +12,7 @@ local UserInputService = game:GetService("UserInputService")
 local RunService       = game:GetService("RunService")
 local Stats            = game:GetService("Stats")
 local Lighting         = game:GetService("Lighting")
+local VirtualUser      = game:GetService("VirtualUser")
 
 local player    = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -186,7 +187,7 @@ make("TextLabel", {
 make("TextLabel", {
     BackgroundTransparency = 1, Position = UDim2.fromOffset(60, 31),
     Size = UDim2.new(1, -120, 0, 16),
-    Text = "Aim • Speed • ESP • Noclip • Voo • Fullbright • TP", TextColor3 = THEME.SubText, TextSize = 12,
+    Text = "Aim • Speed • ESP • Noclip • Voo • Fullbright • TP • AutoClick", TextColor3 = THEME.SubText, TextSize = 12,
     Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left,
 }, top)
 
@@ -1256,6 +1257,74 @@ local function TeleportTo(pos)
 end
 
 -- ==========================================================
+--  🖱️ AUTO CLICKER — FORTE (segurar mouse/toque)
+-- ==========================================================
+local AutoClick = {
+    Enabled = false,
+    CPS = 200,           -- 🔥 padrão alto
+    MaxCPS = 1000,       -- 🔥 máximo absoluto
+    Active = false,
+    Thread = nil,
+    LastClick = 0,
+}
+local autoClickThread = nil
+
+local function AutoClickStop()
+    if autoClickThread then
+        task.cancel(autoClickThread)
+        autoClickThread = nil
+    end
+end
+
+-- 🔥 Loop FORTE: clica o máximo possível por frame
+local function AutoClickStart()
+    AutoClickStop()
+    autoClickThread = task.spawn(function()
+        while AutoClick.Enabled do
+            if AutoClick.Active then
+                -- Calcula quantos cliques cabem no intervalo até o próximo CPS
+                local cps = math.max(AutoClick.CPS, 1)
+                local delay = 1 / cps
+
+                -- Dispara o clique no mesmo frame
+                pcall(function()
+                    VirtualUser:Button1Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+                end)
+                pcall(function()
+                    VirtualUser:Button1Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+                end)
+
+                -- Espera o delay (mas se delay é minúsculo, não trava)
+                if delay > 0 then
+                    task.wait(delay)
+                else
+                    RunService.Heartbeat:Wait()
+                end
+            else
+                -- Se não está segurando, espera um pouco pra não consumir CPU
+                RunService.Heartbeat:Wait()
+            end
+        end
+    end)
+end
+
+-- ✅ Detecta segurar/soltar mouse ou touch
+connect(UserInputService.InputBegan, function(input, processed)
+    if not AutoClick.Enabled then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+       or input.UserInputType == Enum.UserInputType.Touch then
+        AutoClick.Active = true
+    end
+end)
+
+connect(UserInputService.InputEnded, function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+       or input.UserInputType == Enum.UserInputType.Touch then
+        AutoClick.Active = false
+    end
+end)
+
+-- ==========================================================
 --  🎯 ABA AIM
 -- ==========================================================
 local aimTab = newTab("Aim", "🎯", 1)
@@ -1466,7 +1535,7 @@ addToggle(fullTab, "🔦 Ativar Fullbright", false, function(v)
 end)
 
 -- ==========================================================
---  📍 ABA TP — PONTOS SALVOS
+--  📍 ABA TP
 -- ==========================================================
 local tpTab = newTab("TP", "📍", 7)
 text(tpTab, "Teleportes", 20, THEME.Text, Enum.Font.GothamBold)
@@ -1579,9 +1648,51 @@ _G.RefreshTPList()
 text(tpTab, "💡 Salve a posição, dê um nome mental e clique em IR pra voltar.\n⚠️ Pontos são apagados ao reiniciar o script.", 12, Color3.fromRGB(250, 204, 21))
 
 -- ==========================================================
+--  🖱️ ABA AUTO CLICK — FORTE
+-- ==========================================================
+local acTab = newTab("Auto Click", "🖱️", 8)
+text(acTab, "Auto Clicker FORTE 🔥", 20, THEME.Text, Enum.Font.GothamBold)
+text(acTab, "Clica MUITO rápido enquanto você segura o mouse / toca a tela.", 12, THEME.SubText)
+
+addToggle(acTab, "🖱️ Ativar Auto Click (segurar)", false, function(v)
+    AutoClick.Enabled = v
+    if v then
+        AutoClickStart()
+        notify("🔥 Auto Click FORTE ON — segura pra clicar")
+    else
+        AutoClick.Active = false
+        AutoClickStop()
+        notify("🖱️ Auto Click OFF")
+    end
+end)
+
+addSlider(acTab, "Cliques por segundo (CPS)", 10, AutoClick.MaxCPS, AutoClick.CPS, function(v)
+    AutoClick.CPS = v
+end)
+
+addButton(acTab, "🔥 MODO INSANO (CPS 500)", true, function()
+    AutoClick.CPS = 500
+    if AutoClick.Enabled then
+        AutoClickStart()
+    end
+    notify("🔥 CPS definido pra 500")
+end)
+
+addButton(acTab, "⚡ MODO TURBO (CPS 1000)", false, function()
+    AutoClick.CPS = 1000
+    if AutoClick.Enabled then
+        AutoClickStart()
+    end
+    notify("⚡ CPS definido pra 1000")
+end)
+
+text(acTab, "🔥 MODOS FORTES", 12, THEME.SubText, Enum.Font.GothamBold)
+text(acTab, "💡 Segura o botão esquerdo do mouse (ou toca na tela) pra ativar.\n💡 Solta → para de clicar.\n💡 CPS 500 = insano | CPS 1000 = turbo extremo", 12, Color3.fromRGB(250, 204, 21))
+
+-- ==========================================================
 --  ⚙️ ABA CONFIG
 -- ==========================================================
-local cfgTab = newTab("Config", "⚙️", 8)
+local cfgTab = newTab("Config", "⚙️", 9)
 text(cfgTab, "Config", 20, THEME.Text, Enum.Font.GothamBold)
 text(cfgTab, "Personalize o painel do seu jeito.", 12, THEME.SubText)
 
@@ -1703,7 +1814,6 @@ local hit = make("TextButton", {
 
 local isOpen, busy = false, false
 
--- ✅ CONTROLE DO MOUSE
 local savedMouseBehavior = nil
 local savedMouseIcon = nil
 
@@ -1775,7 +1885,6 @@ connect(gui:GetPropertyChangedSignal("AbsoluteSize"), function()
     bubble.Position = clampPos(bubble.Position.X.Offset, bubble.Position.Y.Offset)
 end)
 
--- ✅ BLOCO DA BOLINHA CORRIGIDO
 do
     local function snapToSide()
         local vp = gui.AbsoluteSize
@@ -1822,7 +1931,6 @@ do
         end
     end)
 
-    -- ✅ MouseButton1Click só dispara se clicou NA bolinha
     hit.MouseButton1Click:Connect(function()
         if justDragged then
             justDragged = false
@@ -1832,7 +1940,6 @@ do
     end)
 end
 
--- ✅ Tecla J/RightShift — sem o "processed" que estava bloqueando
 connect(UserInputService.InputBegan, function(input, processed)
     if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
     if input.KeyCode == Enum.KeyCode.J or input.KeyCode == Enum.KeyCode.RightShift then
@@ -1848,9 +1955,7 @@ player.CharacterAdded:Connect(function()
 end)
 
 ESPRefreshPlayers()
-
--- ✅ Painel começa FECHADO — só abre quando aperta J ou clica na bolinha
 showBubble(true)
 
-print("✅ Painel Pro v3.0 — 8 abas (Aim, Speed, ESP, Noclip, Voo, Fullbright, TP, Config)")
-print("🎮 Aperta J ou RightShift pra abrir o painel")
+print("✅ Painel Pro v3.0 — 9 abas (Aim, Speed, ESP, Noclip, Voo, Fullbright, TP, AutoClick FORTE, Config)")
+print("🔥 Auto Click: padrão 200 CPS | Máximo 1000 CPS")
