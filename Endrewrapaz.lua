@@ -1,7 +1,6 @@
 -- ==========================================================
---  💀 PAINEL PRO v3.2 — Aim + Assist + NPC (Team Check) + ESP MELHORADO + Speed + Noclip + Voo + TP + AutoClick + Config
---  ✨ ESP novo: Esqueleto, Caixa, Nome, Distância (toggles separados)
---  ✅ Bugs corrigidos: ordem de função + final completo
+--  💀 PAINEL PRO v3.3 — Aim (mais próximo) + Assist + NPC + ESP + Speed + Noclip + Voo + TP + AutoClick + Config
+--  ✅ Patch: AIM escolhe SEMPRE o mais próximo + fix math.atan
 -- ==========================================================
 
 repeat task.wait(0.1) until game:IsLoaded()
@@ -187,7 +186,7 @@ make("TextLabel", {
 make("TextLabel", {
     BackgroundTransparency = 1, Position = UDim2.fromOffset(60, 31),
     Size = UDim2.new(1, -120, 0, 16),
-    Text = "Aim • Assist • NPC • ESP Novo • Speed • Voo • TP", TextColor3 = THEME.SubText, TextSize = 11,
+    Text = "Aim • Assist • NPC • ESP • Speed • Voo • TP", TextColor3 = THEME.SubText, TextSize = 11,
     Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left,
 }, top)
 
@@ -578,15 +577,17 @@ local function IsAliveHumanoid(h)
 end
 
 -- ==========================================================
---  🎯 AIM (Players + NPCs)
+--  🎯 AIM (Players + NPCs) — MAIS PRÓXIMO
 -- ==========================================================
 local ACONFIG = {
     EnabledPlayers=false, EnabledNPCs=false,
     MaxDistance=5000, FOV=360, TeamCheck=true,
     Prediction=false, PredictionSpeed=400, Smoothness=0,
     AutoFire=false, AFCooldownMin=0.08, AFCooldownMax=0.15, AFMinDot=0.85,
-    SmartSwitch=true, WeightDistance=1.0, WeightAngle=0.35,
-    SwitchMargin=3, SwitchCooldown=0.08, MaxLockTime=5,
+    WeightDistance=10.0,   -- distância domina
+    WeightAngle=0.05,      -- ângulo quase não conta
+    SwitchMargin=0,        -- 0 = troca pro mais próximo na hora
+    MaxLockTime=999,
     OnlyZombies=false,
     NPCTeamCheck=false,
 }
@@ -894,6 +895,9 @@ local function AssistFindTarget()
     return best, bestPart
 end
 
+-- ==========================================================
+--  🔥 UpdateLock — SEMPRE O MAIS PRÓXIMO
+-- ==========================================================
 local function UpdateLock()
     local myChar = player.Character
     if not myChar then
@@ -907,59 +911,38 @@ local function UpdateLock()
         assistTarget, assistPart = nil, nil
         return
     end
+
+    -- ============ AIM PLAYERS + NPCs ============
     if ACONFIG.EnabledPlayers or ACONFIG.EnabledNPCs then
-        if lockTarget then
-            local stillOk = false
-            if lockKind == "player" then
-                stillOk = IsEnemy(lockTarget) and (GetPlayerPart(lockTarget) ~= nil)
-            elseif lockKind == "npc" then
-                stillOk = (lockTarget.Parent ~= nil) and IsNPC(lockTarget) and NPCIsEnemy(lockTarget) and (NPCGetPart(lockTarget) ~= nil)
-            end
-            if stillOk then
-                if lockKind == "player" then lockPart = GetPlayerPart(lockTarget)
-                else lockPart = NPCGetPart(lockTarget) end
-            else
-                lockTarget, lockPart, lockKind = nil, nil, nil
-            end
-        end
         local now = tick()
-        if ACONFIG.SmartSwitch then
-            if now - AIM_LAST_SWITCH >= ACONFIG.SwitchCooldown then
-                local best, bestPart, _, bestDist, bestKind = FindBestTarget()
-                if best and bestPart then
-                    local shouldSwitch = false
-                    if not lockTarget then
-                        shouldSwitch = true
-                    else
-                        local curDist = GetDistToTarget()
-                        if curDist then
-                            if best ~= lockTarget and bestDist and (curDist - bestDist) >= ACONFIG.SwitchMargin then
-                                shouldSwitch = true
-                            end
-                            if (now - AIM_LOCK_START) > ACONFIG.MaxLockTime then
-                                if best ~= lockTarget then shouldSwitch = true end
-                            end
-                        else
-                            shouldSwitch = true
-                        end
-                    end
-                    if shouldSwitch then
-                        lockTarget, lockPart, lockKind = best, bestPart, bestKind
-                        AIM_LAST_SWITCH = now
-                        AIM_LOCK_START = now
-                    end
+
+        local best, bestPart, _, bestDist, bestKind = FindBestTarget()
+
+        if best and bestPart then
+            local shouldSwitch = false
+
+            if not lockTarget then
+                shouldSwitch = true
+            elseif best ~= lockTarget then
+                local curDist = GetDistToTarget()
+                if not curDist then
+                    shouldSwitch = true
+                elseif bestDist and (curDist - bestDist) >= (ACONFIG.SwitchMargin or 0) then
+                    shouldSwitch = true
                 end
+            else
+                lockPart = bestPart
+            end
+
+            if shouldSwitch then
+                lockTarget, lockPart, lockKind = best, bestPart, bestKind
+                AIM_LAST_SWITCH = now
+                AIM_LOCK_START = now
             end
         else
-            if not lockTarget then
-                local best, bestPart, _, _, bestKind = FindBestTarget()
-                if best and bestPart then
-                    lockTarget, lockPart, lockKind = best, bestPart, bestKind
-                    AIM_LAST_SWITCH = now
-                    AIM_LOCK_START = now
-                end
-            end
+            lockTarget, lockPart, lockKind = nil, nil, nil
         end
+
         if lockTarget and lockPart then
             local mp = Camera.CFrame.Position
             local aimPos = lockPart.Position
@@ -978,6 +961,8 @@ local function UpdateLock()
         end
         return
     end
+
+    -- ============ AIM ASSIST ============
     if ASSIST.Enabled then
         assistTarget, assistPart = AssistFindTarget()
         if assistTarget and assistPart then
@@ -995,11 +980,17 @@ local function UpdateLock()
         end
         return
     end
+
     lockTarget, lockPart, lockKind = nil, nil, nil
     assistTarget, assistPart = nil, nil
 end
 
-RunService:BindToRenderStep("AimUnified", Enum.RenderPriority.Last.Value, UpdateLock)
+local okBind = pcall(function()
+    RunService:BindToRenderStep("AimUnified", Enum.RenderPriority.Last.Value, UpdateLock)
+end)
+if not okBind then
+    RunService.RenderStepped:Connect(UpdateLock)
+end
 
 local function MaybeClearLock()
     if not ACONFIG.EnabledPlayers and not ACONFIG.EnabledNPCs then
@@ -1288,7 +1279,7 @@ local function FullbrightStop()
 end
 
 -- ==========================================================
---  👁️ ESP MELHORADO — Esqueleto + Caixa + Nome + Distância
+--  👁️ ESP
 -- ==========================================================
 local ESP_CONFIG = {
     Enabled = true,
@@ -1330,7 +1321,6 @@ local SKELETON_R6 = {
 local ESP_DRAWS = {}
 local ESP_MAX_LINES = 20
 
--- ✅ FIX: ESPRemoveDraw declarado PRIMEIRO
 local ESPRemoveDraw
 ESPRemoveDraw = function(plr)
     local d = ESP_DRAWS[plr]
@@ -1416,7 +1406,8 @@ local function DrawLine2D(frame, p1, p2, color, thickness)
         return
     end
     local center = (p1 + p2) * 0.5
-    local angle = math.deg(math.atan2(diff.Y, diff.X))
+    -- ✅ FIX: math.atan em vez de math.atan2
+    local angle = math.deg(math.atan(diff.Y, diff.X))
     frame.Visible = true
     frame.Position = UDim2.fromOffset(center.X, center.Y)
     frame.Size = UDim2.fromOffset(length, thickness or 1)
@@ -1655,8 +1646,8 @@ local function ACStartClickLoop()
     if AutoClick.Thread then return end
     AutoClick.Thread = task.spawn(function()
         while AutoClick.Touching and AutoClick.Enabled do
-            pcall(function() VirtualUser:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame) end)
-            pcall(function() VirtualUser:Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame) end)
+            pcall(function() VirtualUser:Button1Down(Vector2.new(0,0)) end)
+            pcall(function() VirtualUser:Button1Up(Vector2.new(0,0)) end)
             task.wait(1 / math.max(AutoClick.CPS, 1))
         end
         AutoClick.Thread = nil
@@ -1721,11 +1712,11 @@ connect(UserInputService.InputEnded, function(input)
 end)
 
 -- ==========================================================
---  🎯 ABA AIM PLAYERS
+--  🎯 ABA AIM — MAIS PRÓXIMO
 -- ==========================================================
 local aimTab = newTab("Aim", "🎯", 1)
-text(aimTab, "Aimbot Players (100%)", 20, THEME.Text, Enum.Font.GothamBold)
-text(aimTab, "Cola no inimigo — hard lock.", 12, THEME.SubText)
+text(aimTab, "Aimbot Players (mais próximo)", 20, THEME.Text, Enum.Font.GothamBold)
+text(aimTab, "Trava no mais perto. Troca sozinho se outro ficar mais perto.", 12, THEME.SubText)
 
 addToggle(aimTab, "🎯 Ativar Aim 100% em Players", false, function(v)
     ACONFIG.EnabledPlayers = v
@@ -1735,10 +1726,28 @@ end)
 addToggle(aimTab, "🛡️ Team Check", true, function(v) ACONFIG.TeamCheck = v end)
 addToggle(aimTab, "🎯 Predição", false, function(v) ACONFIG.Prediction = v end)
 addToggle(aimTab, "🔥 Auto Fire", false, function(v) ACONFIG.AutoFire = v end)
+addToggle(aimTab, "🎯 Ignorar ângulo (pega atrás)", true, function(v)
+    ACONFIG.WeightAngle = v and 0.05 or 1.0
+    notify(v and "🎯 Pega em qualquer direção" or "🎯 Só na mira")
+end)
+
 addSlider(aimTab, "FOV (graus)", 5, 360, 360, function(v) ACONFIG.FOV = v end)
 addSlider(aimTab, "Distância máx", 20, 8000, 5000, function(v) ACONFIG.MaxDistance = v end)
 addSlider(aimTab, "Velocidade da bala", 50, 3000, 400, function(v) ACONFIG.PredictionSpeed = v end)
 addSlider(aimTab, "Suavidade (0 = colado)", 0, 1, 0, function(v) ACONFIG.Smoothness = v end, 2)
+addSlider(aimTab, "Prioridade por distância", 1, 20, 10, function(v)
+    ACONFIG.WeightDistance = v
+end)
+addSlider(aimTab, "Tolerância de troca (studs)", 0, 100, 0, function(v)
+    ACONFIG.SwitchMargin = v
+end)
+
+addButton(aimTab, "🔄 Recontar alvos agora", true, function()
+    lockTarget, lockPart, lockKind = nil, nil, nil
+    AIM_LAST_SWITCH = 0
+    AIM_LOCK_START = 0
+    notify("🔄 Vai escolher o mais próximo no próximo frame")
+end)
 
 -- ==========================================================
 --  ✨ ABA AIM ASSIST
@@ -1834,7 +1843,7 @@ addSlider(spdTab, "FOV da câmera", 40, 120, 70, function(v)
 end)
 
 -- ==========================================================
---  👁️ ABA ESP MELHORADO
+--  👁️ ABA ESP
 -- ==========================================================
 local espTab = newTab("ESP", "👁️", 5)
 text(espTab, "ESP Melhorado", 20, THEME.Text, Enum.Font.GothamBold)
@@ -2029,7 +2038,7 @@ addToggle(acTab, "🖱️ Ativar Auto Click", false, function(v)
     AutoClick.Enabled = v
     if v then ACShowBubble(true); notify("👆 Bolinha apareceu!")
     else ACShowBubble(false); AutoClick.Touching = false
-        if AutoClick.Thread then task.cancel(AutoClick.Thread); AutoClick.Thread = nil end
+        if AutoClick.Thread then pcall(task.cancel, AutoClick.Thread); AutoClick.Thread = nil end
         notify("🖱️ Auto Click OFF") end
 end)
 addSlider(acTab, "CPS", 1, 500, 30, function(v) AutoClick.CPS = v end)
@@ -2260,6 +2269,6 @@ end)
 ESPRefresh()
 showBubble(true)
 
-print("✅ Painel Pro v3.2 — 11 abas (Aim, Assist, Aim NPC, Speed, ESP Melhorado, Noclip, Voo, Fullbright, TP, AutoClick, Config)")
-print("👁️ ESP: Esqueleto + Caixa + Nome + Distância (cada um independente)")
-print("🔧 Bugs corrigidos: ordem de função ESPRemoveDraw + final do script completo")
+print("✅ Painel Pro v3.3 — AIM escolhe SEMPRE o mais próximo")
+print("🎯 Aba AIM: prioridade por distância + tolerância de troca")
+print("🔧 Fix: math.atan (ESP não trava mais)")
