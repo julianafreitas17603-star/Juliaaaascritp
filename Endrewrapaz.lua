@@ -1,7 +1,8 @@
 -- ==========================================================
 --  💀 PAINEL PRO v4 — FOV Studio UI + Aim (mais próximo) + Assist + NPC + ESP + Speed + Noclip + Voo + TP + AutoClick
---  🎨 UI: FOV Studio (nova)
---  🧠 Lógica: tudo igual (AIM sempre o mais próximo)
+--  🎨 UI: FOV Studio
+--  🧠 Lógica: AIM sempre o mais próximo
+--  ✅ Fix: função create aceita Instance ou tabela
 -- ==========================================================
 
 local Players           = game:GetService("Players")
@@ -78,10 +79,19 @@ local Theme = {
 local connections = {}
 local notificationsEnabled = true
 
+-- ✅ FIX: aceita Instance OU tabela em children
 local function create(class, props, children)
     local inst = Instance.new(class)
     for k, v in pairs(props or {}) do inst[k] = v end
-    for _, child in ipairs(children or {}) do child.Parent = inst end
+    if children then
+        if typeof(children) == "Instance" then
+            children.Parent = inst
+        else
+            for _, child in ipairs(children) do
+                child.Parent = inst
+            end
+        end
+    end
     return inst
 end
 
@@ -578,8 +588,8 @@ end
 
 local function IsAliveHumanoid(h)
     if not h or h.Health <= 0 then return false end
-    local ok, st = pcall(function() return h:GetState() end)
-    if ok and st and (st == Enum.HumanoidStateType.Dead or st == Enum.HumanoidStateType.None) then
+    local ok2, st = pcall(function() return h:GetState() end)
+    if ok2 and st and (st == Enum.HumanoidStateType.Dead or st == Enum.HumanoidStateType.None) then
         return false
     end
     return true
@@ -845,12 +855,12 @@ local function AssistFindTarget()
     local best, bestPart, bestDist = nil, nil, math.huge
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= player then
-            local ok = true
+            local ok2 = true
             if ASSIST.TeamCheck then
                 local m, h = GetTeamKey(player), GetTeamKey(plr)
-                if m and h then ok = (m ~= h) else ok = false end
+                if m and h then ok2 = (m ~= h) else ok2 = false end
             end
-            if ok then
+            if ok2 then
                 local char = plr.Character
                 local hum  = char and char:FindFirstChildOfClass("Humanoid")
                 if IsAliveHumanoid(hum) then
@@ -1339,8 +1349,8 @@ local function ESPUpdateDraw(draw)
     end
 
     if ESP_CONFIG.Box then
-        local ok, cf, size = pcall(function() return char:GetBoundingBox() end)
-        if ok and cf then
+        local ok2, cf, size = pcall(function() return char:GetBoundingBox() end)
+        if ok2 and cf then
             local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
             local anyOnScreen = false
             for x = -1, 1, 2 do
@@ -1766,11 +1776,11 @@ _G.RefreshTPList = function()
             Size = UDim2.new(1,0,0,26), BackgroundColor3 = Theme.Surface2,
             BackgroundTransparency = 0.4, Text = "Nenhum ponto salvo",
             TextColor3 = Theme.SubText, Font = Enum.Font.Gotham, TextSize = 12,
-        }, savedHolder)
-        empty.Parent = savedHolder
+            Parent = savedHolder,
+        })
     else
         for i, p in ipairs(TPPoints) do
-            local row = create("Frame", { Size = UDim2.new(1,0,0,36), BackgroundColor3 = Theme.Surface, LayoutOrder = i }, savedHolder)
+            local row = create("Frame", { Size = UDim2.new(1,0,0,36), BackgroundColor3 = Theme.Surface, LayoutOrder = i, Parent = savedHolder })
             create("UICorner", { CornerRadius = UDim.new(0, 8) }, row)
             create("UIStroke", { Color = Theme.Stroke, Thickness = 1 }, row)
             label(row, p.name, 12, Theme.Text, Enum.Font.GothamMedium, nil,
@@ -1779,14 +1789,16 @@ _G.RefreshTPList = function()
                 Size = UDim2.fromOffset(48,26), Position = UDim2.new(1,-90,0.5,-13),
                 BackgroundColor3 = Theme.Accent, Text = "IR", TextColor3 = Theme.Text,
                 Font = Enum.Font.GothamBold, TextSize = 12, AutoButtonColor = false,
-            }, row)
+                Parent = row,
+            })
             create("UICorner", { CornerRadius = UDim.new(0, 6) }, irBtn)
             irBtn.MouseButton1Click:Connect(function() TeleportTo(p.pos); notify("TP", "Feito!") end)
             local delBtn = create("TextButton", {
                 Size = UDim2.fromOffset(32,26), Position = UDim2.new(1,-38,0.5,-13),
                 BackgroundColor3 = Theme.Danger, Text = "X", TextColor3 = Theme.Text,
                 Font = Enum.Font.GothamBold, TextSize = 12, AutoButtonColor = false,
-            }, row)
+                Parent = row,
+            })
             create("UICorner", { CornerRadius = UDim.new(0, 6) }, delBtn)
             delBtn.MouseButton1Click:Connect(function()
                 table.remove(TPPoints, i); _G.RefreshTPList(); notify("TP", "Ponto removido")
