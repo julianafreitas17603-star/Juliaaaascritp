@@ -1,6 +1,7 @@
 -- ==========================================================
---  💀 PAINEL PRO v3.2 — Aim + Assist + NPC (Team Check) + Speed + ESP MELHORADO + Noclip + Voo + TP + AutoClick + Config
+--  💀 PAINEL PRO v3.2 — Aim + Assist + NPC (Team Check) + ESP MELHORADO + Speed + Noclip + Voo + TP + AutoClick + Config
 --  ✨ ESP novo: Esqueleto, Caixa, Nome, Distância (toggles separados)
+--  ✅ Bugs corrigidos: ordem de função + final completo
 -- ==========================================================
 
 repeat task.wait(0.1) until game:IsLoaded()
@@ -1329,6 +1330,19 @@ local SKELETON_R6 = {
 local ESP_DRAWS = {}
 local ESP_MAX_LINES = 20
 
+-- ✅ FIX: ESPRemoveDraw declarado PRIMEIRO
+local ESPRemoveDraw
+ESPRemoveDraw = function(plr)
+    local d = ESP_DRAWS[plr]
+    if d then
+        for _, f in ipairs(d.skeleton) do pcall(function() f:Destroy() end) end
+        for _, f in ipairs(d.box) do pcall(function() f:Destroy() end) end
+        if d.name then pcall(function() d.name:Destroy() end) end
+        if d.dist then pcall(function() d.dist:Destroy() end) end
+        ESP_DRAWS[plr] = nil
+    end
+end
+
 local function ESPIsEnemy(plr)
     if plr == player then return false end
     local char = plr.Character
@@ -1387,17 +1401,6 @@ local function ESPCreateDraw(plr, char)
     ESP_DRAWS[plr] = draw
 end
 
-function ESPRemoveDraw(plr)
-    local d = ESP_DRAWS[plr]
-    if d then
-        for _, f in ipairs(d.skeleton) do pcall(function() f:Destroy() end) end
-        for _, f in ipairs(d.box) do pcall(function() f:Destroy() end) end
-        if d.name then pcall(function() d.name:Destroy() end) end
-        if d.dist then pcall(function() d.dist:Destroy() end) end
-        ESP_DRAWS[plr] = nil
-    end
-end
-
 local function ESPHideAll(draw)
     for _, f in ipairs(draw.skeleton) do f.Visible = false end
     for _, f in ipairs(draw.box) do f.Visible = false end
@@ -1449,7 +1452,6 @@ local function ESPUpdateDraw(draw)
     local color = ESP_CONFIG.Color
     local thickness = ESP_CONFIG.Thickness
 
-    -- Skeleton
     if ESP_CONFIG.Skeleton then
         local bones = char:FindFirstChild("UpperTorso") and SKELETON_R15 or SKELETON_R6
         local lineIdx = 0
@@ -1474,7 +1476,6 @@ local function ESPUpdateDraw(draw)
         for _, f in ipairs(draw.skeleton) do f.Visible = false end
     end
 
-    -- Box
     if ESP_CONFIG.Box then
         local ok, cf, size = pcall(function() return char:GetBoundingBox() end)
         if ok and cf then
@@ -1517,7 +1518,6 @@ local function ESPUpdateDraw(draw)
         for _, f in ipairs(draw.box) do f.Visible = false end
     end
 
-    -- Name
     if ESP_CONFIG.Name then
         local head = char:FindFirstChild("Head") or hrp
         local sp, on = W2S(head.Position + Vector3.new(0, 1.2, 0))
@@ -1533,7 +1533,6 @@ local function ESPUpdateDraw(draw)
         draw.name.Visible = false
     end
 
-    -- Distance
     if ESP_CONFIG.Distance then
         local head = char:FindFirstChild("Head") or hrp
         local sp, on = W2S(head.Position + Vector3.new(0, -0.8, 0))
@@ -1599,8 +1598,8 @@ local function ESPClearAll()
 end
 
 local function ESPUpdateTeamCheck()
-    for _, d in pairs(ESP_DRAWS) do
-        if not ESPIsEnemy(d.plr) then ESPRemoveDraw(d.plr) end
+    for plr, _ in pairs(ESP_DRAWS) do
+        if not ESPIsEnemy(plr) then ESPRemoveDraw(plr) end
     end
     ESPRefresh()
 end
@@ -1621,7 +1620,7 @@ local function TeleportTo(pos)
 end
 
 -- ==========================================================
---  🖱️ AUTO CLICKER — BOLINHA
+--  🖱️ AUTO CLICKER
 -- ==========================================================
 local AutoClick = { Enabled=false, CPS=30, Thread=nil, Touching=false, BubbleVisible=false }
 local AC_BUBBLE = 80
@@ -1746,7 +1745,7 @@ addSlider(aimTab, "Suavidade (0 = colado)", 0, 1, 0, function(v) ACONFIG.Smoothn
 -- ==========================================================
 local assistTab = newTab("Assist", "✨", 2)
 text(assistTab, "Aim Assist (suave)", 20, THEME.Text, Enum.Font.GothamBold)
-text(assistTab, "Puxa a mira suavemente pro inimigo.", 12, THEME.SubText)
+text(assistTab, "Puxa a mira suavemente.", 12, THEME.SubText)
 addToggle(assistTab, "✨ Ativar Aim Assist", false, function(v)
     ASSIST.Enabled = v
     notify(v and "✨ Assist ON" or "Assist OFF")
@@ -1877,7 +1876,6 @@ text(espTab, "⚙️ AJUSTES", 12, THEME.SubText, Enum.Font.GothamBold)
 addSlider(espTab, "Distância máx (studs)", 50, 5000, 1500, function(v)
     ESP_CONFIG.MaxDistance = v
 end)
-
 addSlider(espTab, "Tamanho do texto", 8, 24, 12, function(v)
     ESP_CONFIG.TextSize = v
     for _, d in pairs(ESP_DRAWS) do
@@ -1885,7 +1883,6 @@ addSlider(espTab, "Tamanho do texto", 8, 24, 12, function(v)
         if d.dist then d.dist.TextSize = v end
     end
 end)
-
 addSlider(espTab, "Espessura das linhas", 1, 5, 1, function(v)
     ESP_CONFIG.Thickness = v
 end)
@@ -2078,3 +2075,191 @@ addToggle(cfgTab, "👤 Mostrar perfil", true, function(v) profile.Visible = v e
 selectTab("Aim")
 
 -- ==========================================================
+--  🔵 BOLINHA DO PAINEL
+-- ==========================================================
+local bubble = make("Frame", {
+    Name = "Bubble", Size = UDim2.fromOffset(BUBBLE, BUBBLE),
+    Position = UDim2.fromOffset(16, 180), BackgroundColor3 = THEME.Accent,
+    Visible = false, ZIndex = 50,
+}, gui)
+round(bubble, BUBBLE / 2)
+accentGradient(bubble, 45)
+local bubbleStroke = stroke(bubble, THEME.White, 3, 0.4)
+local bubbleScale = make("UIScale", { Scale = 0 }, bubble)
+
+TweenService:Create(
+    bubbleStroke,
+    TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+    { Transparency = 0.05 }
+):Play()
+
+local ring = make("Frame", {
+    AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+    Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 49,
+}, bubble)
+round(ring, BUBBLE / 2)
+local ringStroke = stroke(ring, THEME.White, 2, 0.35)
+local ringScale = make("UIScale", { Scale = 1 }, ring)
+local ringInfo = TweenInfo.new(1.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, -1, false)
+TweenService:Create(ringScale, ringInfo, { Scale = 1.7 }):Play()
+TweenService:Create(ringStroke, ringInfo, { Transparency = 1 }):Play()
+
+local hit = make("TextButton", {
+    Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
+    Text = "💀", TextColor3 = THEME.White, TextSize = 30,
+    Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 51,
+}, bubble)
+
+local isOpen, busy = false, false
+
+local savedMouseBehavior = nil
+local savedMouseIcon = nil
+
+local function unlockMouse()
+    pcall(function()
+        savedMouseBehavior = UserInputService.MouseBehavior
+        savedMouseIcon = UserInputService.MouseIconEnabled
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+        UserInputService.MouseIconEnabled = true
+    end)
+end
+
+local function lockMouse()
+    pcall(function()
+        UserInputService.MouseBehavior = savedMouseBehavior or Enum.MouseBehavior.LockCenter
+        if savedMouseIcon ~= nil then
+            UserInputService.MouseIconEnabled = savedMouseIcon
+        end
+    end)
+end
+
+local function showBubble(show)
+    if show then
+        bubble.Visible = true
+        bubbleScale.Scale = 0
+        tween(bubbleScale, { Scale = 1 }, 0.45, Enum.EasingStyle.Back)
+    else
+        tween(bubbleScale, { Scale = 0 }, 0.18)
+        task.delay(0.2, function()
+            if isOpen then bubble.Visible = false end
+        end)
+    end
+end
+
+local function openWindow()
+    if isOpen or busy then return end
+    busy, isOpen = true, true
+    showBubble(false)
+    root.Visible = true
+    anim.Scale = 0.7
+    tween(anim, { Scale = 1 }, 0.55, Enum.EasingStyle.Back)
+    unlockMouse()
+    task.delay(0.55, function() busy = false end)
+end
+
+local function minimizeWindow()
+    if not isOpen or busy then return end
+    busy, isOpen = true, false
+    tween(anim, { Scale = 0.5 }, 0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+    task.delay(0.27, function()
+        root.Visible = false
+        showBubble(true)
+        busy = false
+        lockMouse()
+    end)
+end
+
+minBtn.Activated:Connect(minimizeWindow)
+
+local function clampPos(x, y)
+    local vp = gui.AbsoluteSize
+    return UDim2.fromOffset(
+        math.clamp(x, 8, math.max(8, vp.X - BUBBLE - 8)),
+        math.clamp(y, 30, math.max(30, vp.Y - BUBBLE - 8))
+    )
+end
+
+connect(gui:GetPropertyChangedSignal("AbsoluteSize"), function()
+    bubble.Position = clampPos(bubble.Position.X.Offset, bubble.Position.Y.Offset)
+end)
+
+do
+    local function snapToSide()
+        local vp = gui.AbsoluteSize
+        local x = bubble.Position.X.Offset
+        local target = (x + BUBBLE / 2 < vp.X / 2) and 10 or (vp.X - BUBBLE - 10)
+        tween(bubble, { Position = UDim2.fromOffset(target, bubble.Position.Y.Offset) }, 0.45, Enum.EasingStyle.Back)
+    end
+
+    local pressing, moved, startMouse, startPos = false, false, nil, nil
+    local justDragged = false
+
+    hit.InputBegan:Connect(function(input)
+        if isPointer(input) then
+            pressing = true
+            moved = false
+            justDragged = false
+            startMouse = input.Position
+            startPos = bubble.Position
+            tween(bubbleScale, { Scale = 0.9 }, 0.1)
+        end
+    end)
+
+    connect(UserInputService.InputChanged, function(input)
+        if pressing and isMove(input) then
+            local d = input.Position - startMouse
+            if not moved and d.Magnitude > 8 then
+                moved = true
+                justDragged = true
+            end
+            if moved then
+                bubble.Position = clampPos(startPos.X.Offset + d.X, startPos.Y.Offset + d.Y)
+            end
+        end
+    end)
+
+    connect(UserInputService.InputEnded, function(input)
+        if not pressing then return end
+        if not isPointer(input) then return end
+        pressing = false
+        tween(bubbleScale, { Scale = 1 }, 0.25, Enum.EasingStyle.Back)
+        if moved then
+            snapToSide()
+            task.delay(0.1, function() justDragged = false end)
+        end
+    end)
+
+    hit.MouseButton1Click:Connect(function()
+        if justDragged then
+            justDragged = false
+            return
+        end
+        openWindow()
+    end)
+end
+
+connect(UserInputService.InputBegan, function(input, processed)
+    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+    if input.KeyCode == Enum.KeyCode.J or input.KeyCode == Enum.KeyCode.RightShift then
+        if isOpen then minimizeWindow() else openWindow() end
+    end
+end)
+
+player.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    lockTarget, lockPart, lockKind = nil, nil, nil
+    assistTarget, assistPart = nil, nil
+    AIM_LAST_SWITCH = 0
+    AIM_LOCK_START = 0
+    ESPClearAll()
+    task.wait(1)
+    ESPRefresh()
+end)
+
+-- Estado inicial
+ESPRefresh()
+showBubble(true)
+
+print("✅ Painel Pro v3.2 — 11 abas (Aim, Assist, Aim NPC, Speed, ESP Melhorado, Noclip, Voo, Fullbright, TP, AutoClick, Config)")
+print("👁️ ESP: Esqueleto + Caixa + Nome + Distância (cada um independente)")
+print("🔧 Bugs corrigidos: ordem de função ESPRemoveDraw + final do script completo")
