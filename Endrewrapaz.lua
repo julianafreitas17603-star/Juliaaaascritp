@@ -1,7 +1,6 @@
 -- ==========================================================
---  💀 PAINEL PRO v3.4 — FOV Studio UI
---  ✅ Lógica igual (AIM mais próximo, ESP, Voo, etc)
---  🎨 Interface trocada pra FOV Studio (dark moderno)
+--  💀 PAINEL PRO v3.3 — Aim (mais próximo) + Assist + NPC + ESP + Speed + Noclip + Voo + TP + AutoClick + Config
+--  ✅ Patch: AIM escolhe SEMPRE o mais próximo + fix math.atan
 -- ==========================================================
 
 repeat task.wait(0.1) until game:IsLoaded()
@@ -19,26 +18,23 @@ local player    = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local Camera    = workspace.CurrentCamera
 
--- ==========================================================
---  🎨 TEMA FOV STUDIO
--- ==========================================================
 local THEME = {
-    Bg      = Color3.fromRGB(10, 10, 12),
-    Bg2     = Color3.fromRGB(14, 14, 17),
-    Surface = Color3.fromRGB(20, 20, 25),
-    Card    = Color3.fromRGB(30, 30, 38),
-    Accent  = Color3.fromRGB(124, 92, 255),
+    Bg      = Color3.fromRGB(26, 28, 46),
+    Bg2     = Color3.fromRGB(40, 44, 70),
+    Surface = Color3.fromRGB(33, 36, 58),
+    Card    = Color3.fromRGB(47, 52, 80),
+    Accent  = Color3.fromRGB(139, 108, 255),
     Accent2 = Color3.fromRGB(56, 189, 248),
-    Text    = Color3.fromRGB(240, 240, 246),
-    SubText = Color3.fromRGB(135, 135, 152),
-    Off     = Color3.fromRGB(42, 42, 52),
-    Success = Color3.fromRGB(70, 210, 140),
-    Danger  = Color3.fromRGB(255, 82, 92),
+    Text    = Color3.fromRGB(255, 255, 255),
+    SubText = Color3.fromRGB(190, 196, 224),
+    Off     = Color3.fromRGB(88, 94, 130),
+    Success = Color3.fromRGB(52, 211, 153),
+    Danger  = Color3.fromRGB(239, 68, 68),
     White   = Color3.new(1, 1, 1),
 }
 
 local PRESETS = {
-    { "Roxo",    Color3.fromRGB(124, 92, 255), Color3.fromRGB(56, 189, 248) },
+    { "Roxo",    Color3.fromRGB(139, 108, 255), Color3.fromRGB(56, 189, 248) },
     { "Rosa",    Color3.fromRGB(244, 114, 182), Color3.fromRGB(251, 146, 60) },
     { "Verde",   Color3.fromRGB(52, 211, 153),  Color3.fromRGB(56, 189, 248) },
     { "Laranja", Color3.fromRGB(251, 146, 60),  Color3.fromRGB(250, 204, 21) },
@@ -110,27 +106,11 @@ local function isMove(i)
     return i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch
 end
 
-local function safeParent(g)
-    local ok, ui = pcall(function() return gethui and gethui() end)
-    if ok and ui then
-        pcall(function() g.Parent = ui end)
-        if g.Parent == ui then return end
-    end
-    local core = game:GetService("CoreGui")
-    pcall(function() g.Parent = core end)
-    if g.Parent == core then return end
-    g.Parent = playerGui
-end
-
--- ==========================================================
---  📦 UI PRINCIPAL
--- ==========================================================
 local gui = make("ScreenGui", {
     Name = "PainelPro", ResetOnSpawn = false,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-    IgnoreGuiInset = true, DisplayOrder = 999,
-}, nil)
-safeParent(gui)
+    IgnoreGuiInset = true, DisplayOrder = 100,
+}, playerGui)
 
 local root = make("Frame", {
     Name = "Root", AnchorPoint = Vector2.new(0.5, 0.5),
@@ -169,11 +149,12 @@ make("ImageLabel", {
 local main = make("Frame", {
     Name = "Main", Size = UDim2.fromScale(1, 1),
     BackgroundColor3 = THEME.Bg, BorderSizePixel = 0, ClipsDescendants = true,
+    BackgroundTransparency = 0,
 }, win)
-round(main, 14)
+round(main, 18)
 make("UIGradient", { Color = ColorSequence.new(THEME.Bg2, THEME.Bg), Rotation = 135 }, main)
 
-local borderStroke = stroke(main, THEME.Accent, 1.5, 0.3)
+local borderStroke = stroke(main, THEME.Accent, 2.5, 0.1)
 local borderGrad = make("UIGradient", {}, borderStroke)
 themed(function()
     borderGrad.Color = ColorSequence.new({
@@ -184,60 +165,47 @@ themed(function()
 end)
 TweenService:Create(borderGrad, TweenInfo.new(4, Enum.EasingStyle.Linear, Enum.EasingDirection.In, -1), { Rotation = 360 }):Play()
 
--- TITLE BAR
-local top = make("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundColor3 = THEME.Surface, BorderSizePixel = 0 }, main)
-make("Frame", {
-    AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, 0),
-    Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = THEME.Card,
-}, top)
-
+local top = make("Frame", { Size = UDim2.new(1, 0, 0, 58), BackgroundTransparency = 1 }, main)
 local logo = make("Frame", {
-    Position = UDim2.fromOffset(14, 11), Size = UDim2.fromOffset(22, 22),
-    BackgroundColor3 = THEME.Accent, BorderSizePixel = 0,
+    Position = UDim2.fromOffset(14, 11), Size = UDim2.fromOffset(36, 36),
+    BackgroundColor3 = THEME.Accent,
 }, top)
-round(logo, 7)
+round(logo, 11)
 accentGradient(logo, 45)
 make("TextLabel", {
     BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1),
-    Text = "💀", TextColor3 = THEME.White, TextSize = 13, Font = Enum.Font.GothamBlack,
+    Text = "💀", TextColor3 = THEME.White, TextSize = 19, Font = Enum.Font.GothamBold,
 }, logo)
 
 make("TextLabel", {
-    BackgroundTransparency = 1, Position = UDim2.fromOffset(46, 6),
-    Size = UDim2.new(1, -150, 0, 18),
-    Text = "Painel Pro", TextColor3 = THEME.Text, TextSize = 14,
+    BackgroundTransparency = 1, Position = UDim2.fromOffset(60, 11),
+    Size = UDim2.new(1, -120, 0, 20),
+    Text = "Painel Pro", TextColor3 = THEME.Text, TextSize = 17,
     Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left,
 }, top)
 make("TextLabel", {
-    BackgroundTransparency = 1, Position = UDim2.fromOffset(46, 23),
-    Size = UDim2.new(1, -150, 0, 14),
-    Text = "Aim • ESP • Voo • Speed", TextColor3 = THEME.SubText, TextSize = 11,
+    BackgroundTransparency = 1, Position = UDim2.fromOffset(60, 31),
+    Size = UDim2.new(1, -120, 0, 16),
+    Text = "Aim • Assist • NPC • ESP • Speed • Voo • TP", TextColor3 = THEME.SubText, TextSize = 11,
     Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left,
 }, top)
 
-local function titleBtn(text, xOff, hoverColor)
-    local btn = make("TextButton", {
-        Text = text, Font = Enum.Font.GothamBold, TextSize = 16,
-        TextColor3 = THEME.SubText, AutoButtonColor = false,
-        BackgroundColor3 = THEME.Card, BackgroundTransparency = 1,
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, xOff, 0.5, 0),
-        Size = UDim2.fromOffset(30, 30),
-    }, top)
-    round(btn, 8)
-    btn.MouseEnter:Connect(function()
-        tween(btn, 0.15, { BackgroundTransparency = 0, BackgroundColor3 = hoverColor, TextColor3 = THEME.Text })
-    end)
-    btn.MouseLeave:Connect(function()
-        tween(btn, 0.15, { BackgroundTransparency = 1, TextColor3 = THEME.SubText })
-    end)
-    return btn
-end
+local minBtn = make("TextButton", {
+    AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0),
+    Size = UDim2.fromOffset(36, 36), BackgroundColor3 = THEME.Card,
+    Text = "–", TextColor3 = THEME.Text, TextSize = 22,
+    Font = Enum.Font.GothamBold, AutoButtonColor = false,
+}, top)
+round(minBtn, 18)
+stroke(minBtn, THEME.White, 1, 0.8)
+minBtn.MouseEnter:Connect(function() tween(minBtn, { BackgroundColor3 = THEME.Accent }) end)
+minBtn.MouseLeave:Connect(function() tween(minBtn, { BackgroundColor3 = THEME.Card }) end)
 
-local BotaoFechar = titleBtn("X", -10, THEME.Danger)
-local minBtn = titleBtn("-", -46, THEME.Card)
+make("Frame", {
+    Position = UDim2.fromOffset(14, 58), Size = UDim2.new(1, -28, 0, 1),
+    BackgroundColor3 = THEME.White, BackgroundTransparency = 0.88, BorderSizePixel = 0,
+}, main)
 
--- DRAG
 do
     local dragging, dragStart, startPos
     top.InputBegan:Connect(function(input)
@@ -259,40 +227,32 @@ do
     end)
 end
 
--- SIDEBAR
-local SIDE = 132
 local sidebar = make("Frame", {
-    Position = UDim2.fromOffset(0, 44), Size = UDim2.new(0, SIDE, 1, -44),
-    BackgroundColor3 = THEME.Bg2, BorderSizePixel = 0,
+    Position = UDim2.fromOffset(10, 68), Size = UDim2.new(0, 138, 1, -78),
+    BackgroundColor3 = THEME.Surface, BorderSizePixel = 0,
 }, main)
-make("Frame", {
-    AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0),
-    Size = UDim2.new(0, 1, 1, 0), BackgroundColor3 = THEME.Card,
-}, sidebar)
+round(sidebar, 14)
+stroke(sidebar, THEME.White, 1, 0.88)
 
-local indicator = make("Frame", {
-    Position = UDim2.fromOffset(0, 12), Size = UDim2.fromOffset(3, 18),
-    BackgroundColor3 = THEME.Accent, BorderSizePixel = 0,
-}, sidebar)
-round(indicator, 2)
-
-local tabHolder = make("Frame", { Position = UDim2.fromOffset(0, 8), Size = UDim2.new(1, 0, 1, -16), BackgroundTransparency = 1 }, sidebar)
+local tabHolder = make("Frame", { Size = UDim2.new(1, 0, 1, -64), BackgroundTransparency = 1 }, sidebar)
 make("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }, tabHolder)
+make("UIPadding", {
+    PaddingTop = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6),
+}, tabHolder)
 
--- PROFILE (mantido pra compat)
 local profile = make("Frame", {
     AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 8, 1, -8),
-    Size = UDim2.new(1, -16, 0, 44), BackgroundColor3 = THEME.Card,
+    Size = UDim2.new(1, -16, 0, 48), BackgroundColor3 = THEME.Card,
     Visible = true,
 }, sidebar)
-round(profile, 10)
+round(profile, 12)
 
 local avatar = make("ImageLabel", {
-    Position = UDim2.fromOffset(8, 8), Size = UDim2.fromOffset(28, 28),
+    Position = UDim2.fromOffset(8, 8), Size = UDim2.fromOffset(32, 32),
     BackgroundColor3 = THEME.Off, Image = "",
 }, profile)
-round(avatar, 14)
-local avatarStroke = stroke(avatar, THEME.Accent, 1.5, 0)
+round(avatar, 16)
+local avatarStroke = stroke(avatar, THEME.Accent, 2, 0)
 themed(function() avatarStroke.Color = THEME.Accent end)
 task.spawn(function()
     local ok, img = pcall(function()
@@ -302,21 +262,20 @@ task.spawn(function()
 end)
 
 make("TextLabel", {
-    BackgroundTransparency = 1, Position = UDim2.fromOffset(42, 6),
-    Size = UDim2.new(1, -46, 0, 16), Text = player.DisplayName,
-    TextColor3 = THEME.Text, TextSize = 12, Font = Enum.Font.GothamBold,
+    BackgroundTransparency = 1, Position = UDim2.fromOffset(46, 8),
+    Size = UDim2.new(1, -50, 0, 18), Text = player.DisplayName,
+    TextColor3 = THEME.Text, TextSize = 13, Font = Enum.Font.GothamBold,
     TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
 }, profile)
 make("TextLabel", {
-    BackgroundTransparency = 1, Position = UDim2.fromOffset(42, 22),
-    Size = UDim2.new(1, -46, 0, 14), Text = "● Online",
-    TextColor3 = THEME.Success, TextSize = 10, Font = Enum.Font.GothamMedium,
+    BackgroundTransparency = 1, Position = UDim2.fromOffset(46, 26),
+    Size = UDim2.new(1, -50, 0, 14), Text = "● Online",
+    TextColor3 = THEME.Success, TextSize = 11, Font = Enum.Font.GothamMedium,
     TextXAlignment = Enum.TextXAlignment.Left,
 }, profile)
 
--- CONTENT
 local content = make("Frame", {
-    Position = UDim2.fromOffset(SIDE, 44), Size = UDim2.new(1, -SIDE, 1, -44),
+    Position = UDim2.fromOffset(156, 59), Size = UDim2.new(1, -156, 1, -59),
     BackgroundTransparency = 1, ClipsDescendants = true,
 }, main)
 
@@ -324,52 +283,50 @@ local pages, tabButtons = {}, {}
 local currentTab
 
 local function selectTab(name)
-    if currentTab == name then return end
     currentTab = name
     for n, page in pairs(pages) do
         local active = (n == name)
         if active and not page.Visible then
-            page.Position = UDim2.fromOffset(0, 14)
+            page.Position = UDim2.fromOffset(0, 16)
             tween(page, { Position = UDim2.fromOffset(0, 0) }, 0.35, Enum.EasingStyle.Quart)
         end
         page.Visible = active
         tween(tabButtons[n], {
             BackgroundTransparency = active and 0 or 1,
-            TextColor3 = active and THEME.Text or THEME.SubText,
+            TextColor3 = active and THEME.White or THEME.SubText,
         })
     end
-    tween(indicator, { Position = UDim2.fromOffset(0, tabButtons[name].y + 8) }, 0.3, Enum.EasingStyle.Back)
 end
 
 local function newTab(name, icon, tabOrder)
     local btn = make("TextButton", {
-        Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = THEME.Card,
-        BackgroundTransparency = 1, Text = (icon or "") .. "  " .. name,
-        TextColor3 = THEME.SubText, TextSize = 11, Font = Enum.Font.GothamMedium,
+        Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = THEME.Accent,
+        BackgroundTransparency = 1, Text = icon .. "  " .. name,
+        TextColor3 = THEME.SubText, TextSize = 12, Font = Enum.Font.GothamBold,
         TextXAlignment = Enum.TextXAlignment.Left, AutoButtonColor = false,
         LayoutOrder = tabOrder,
     }, tabHolder)
-    round(btn, 8)
-    make("UIPadding", { PaddingLeft = UDim.new(0, 12) }, btn)
-    themed(function() btn.BackgroundColor3 = THEME.Card end)
+    round(btn, 10)
+    make("UIPadding", { PaddingLeft = UDim.new(0, 8) }, btn)
+    themed(function() btn.BackgroundColor3 = THEME.Accent end)
 
     btn.MouseEnter:Connect(function()
-        if currentTab ~= name then tween(btn, { BackgroundTransparency = 0.5, TextColor3 = THEME.Text }) end
+        if currentTab ~= name then tween(btn, { BackgroundTransparency = 0.8 }) end
     end)
     btn.MouseLeave:Connect(function()
-        if currentTab ~= name then tween(btn, { BackgroundTransparency = 1, TextColor3 = THEME.SubText }) end
+        if currentTab ~= name then tween(btn, { BackgroundTransparency = 1 }) end
     end)
 
     local page = make("ScrollingFrame", {
         Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
         BorderSizePixel = 0, ScrollBarThickness = 3,
-        ScrollBarImageColor3 = THEME.Accent,
         CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
         Visible = false,
     }, content)
-    make("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, page)
+    themed(function() page.ScrollBarImageColor3 = THEME.Accent end)
+    make("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }, page)
     make("UIPadding", {
-        PaddingTop = UDim.new(0, 12), PaddingLeft = UDim.new(0, 12),
+        PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 8),
         PaddingRight = UDim.new(0, 14), PaddingBottom = UDim.new(0, 14),
     }, page)
 
@@ -383,17 +340,17 @@ local function text(parent, str, size, color, font)
         BackgroundTransparency = 1, Text = str, TextSize = size, TextColor3 = color,
         Font = font or Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left,
         TextWrapped = true,
-        Size = UDim2.new(1, 0, 0, (size * 2) + 4), LayoutOrder = order(),
+        Size = UDim2.new(1, 0, 0, (size * 2) + 6), LayoutOrder = order(),
     }, parent)
 end
 
 local function card(parent, height)
     local c = make("Frame", {
-        Size = UDim2.new(1, 0, 0, height), BackgroundColor3 = THEME.Surface,
-        BorderSizePixel = 0, LayoutOrder = order(),
+        Size = UDim2.new(1, 0, 0, height), BackgroundColor3 = THEME.Card,
+        LayoutOrder = order(),
     }, parent)
-    round(c, 10)
-    stroke(c, THEME.Card, 1, 0.3)
+    round(c, 12)
+    stroke(c, THEME.White, 1, 0.86)
     return c
 end
 
@@ -406,82 +363,80 @@ local function makeListHolder(parent)
     return h
 end
 
-local function addToggle(parent, labelText, default, callback)
+local function addToggle(parent, label, default, callback)
     local state = default or false
-    local row = card(parent, 42)
+    local row = card(parent, 44)
     make("TextLabel", {
         BackgroundTransparency = 1, Position = UDim2.fromOffset(14, 0),
-        Size = UDim2.new(1, -80, 1, 0), Text = labelText,
-        TextColor3 = THEME.Text, TextSize = 13, Font = Enum.Font.GothamMedium,
+        Size = UDim2.new(1, -80, 1, 0), Text = label,
+        TextColor3 = THEME.Text, TextSize = 14, Font = Enum.Font.GothamMedium,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, row)
     local track = make("TextButton", {
-        AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0),
-        Size = UDim2.fromOffset(42, 22), BackgroundColor3 = THEME.Off,
+        AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0),
+        Size = UDim2.fromOffset(46, 26), BackgroundColor3 = THEME.Off,
         Text = "", AutoButtonColor = false,
     }, row)
-    round(track, 11)
+    round(track, 13)
     themed(function() track.BackgroundColor3 = state and THEME.Accent or THEME.Off end)
     local knob = make("Frame", {
         AnchorPoint = Vector2.new(0, 0.5),
-        Position = state and UDim2.new(1, -19, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
-        Size = UDim2.fromOffset(16, 16), BackgroundColor3 = THEME.White,
+        Position = state and UDim2.new(1, -23, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
+        Size = UDim2.fromOffset(20, 20), BackgroundColor3 = THEME.White,
     }, track)
-    round(knob, 8)
+    round(knob, 10)
     track.Activated:Connect(function()
         state = not state
         tween(track, { BackgroundColor3 = state and THEME.Accent or THEME.Off })
         tween(knob, {
-            Position = state and UDim2.new(1, -19, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
+            Position = state and UDim2.new(1, -23, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
         }, 0.3, Enum.EasingStyle.Back)
         if callback then callback(state) end
     end)
     return row
 end
 
-local function addSlider(parent, labelText, min, max, default, callback, decimals)
+local function addSlider(parent, label, min, max, default, callback, decimals)
     decimals = decimals or 0
     local mult = 10 ^ decimals
     local value = default or min
-    local row = card(parent, 58)
+    local row = card(parent, 62)
     make("TextLabel", {
         BackgroundTransparency = 1, Position = UDim2.fromOffset(14, 8),
-        Size = UDim2.new(1, -100, 0, 18), Text = labelText,
-        TextColor3 = THEME.Text, TextSize = 13, Font = Enum.Font.GothamMedium,
+        Size = UDim2.new(1, -100, 0, 20), Text = label,
+        TextColor3 = THEME.Text, TextSize = 14, Font = Enum.Font.GothamMedium,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, row)
     local valueLabel = make("TextLabel", {
         BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.new(1, -14, 0, 8), Size = UDim2.fromOffset(80, 18),
-        Text = tostring(value), TextColor3 = THEME.Accent2, TextSize = 13,
+        Position = UDim2.new(1, -14, 0, 8), Size = UDim2.fromOffset(80, 20),
+        Text = tostring(value), TextColor3 = THEME.Accent2, TextSize = 14,
         Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Right,
     }, row)
     themed(function() valueLabel.TextColor3 = THEME.Accent2 end)
     local bar = make("Frame", {
-        Position = UDim2.new(0, 14, 0, 38), Size = UDim2.new(1, -28, 0, 6),
+        Position = UDim2.new(0, 14, 0, 42), Size = UDim2.new(1, -28, 0, 8),
         BackgroundColor3 = THEME.Off,
     }, row)
-    round(bar, 3)
-    local pct0 = (value - min) / (max - min)
+    round(bar, 4)
     local fill = make("Frame", {
-        Size = UDim2.fromScale(pct0, 1),
+        Size = UDim2.fromScale((value - min) / (max - min), 1),
         BackgroundColor3 = THEME.Accent,
     }, bar)
-    round(fill, 3)
+    round(fill, 4)
     accentGradient(fill, 0)
     local knob = make("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(pct0, 0, 0.5, 0),
-        Size = UDim2.fromOffset(16, 16), BackgroundColor3 = THEME.White,
-    }, bar)
-    round(knob, 8)
-    local knobStroke = stroke(knob, THEME.Accent, 2, 0)
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, 0, 0.5, 0),
+        Size = UDim2.fromOffset(20, 20), BackgroundColor3 = THEME.White,
+    }, fill)
+    round(knob, 10)
+    local knobStroke = stroke(knob, THEME.Accent, 3, 0)
     themed(function() knobStroke.Color = THEME.Accent end)
     local function update(input)
         local rel = math.clamp((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
         value = math.floor((min + (max - min) * rel) * mult + 0.5) / mult
         valueLabel.Text = (decimals > 0) and string.format("%." .. decimals .. "f", value) or tostring(value)
         tween(fill, { Size = UDim2.fromScale(rel, 1) }, 0.06)
-        tween(knob, { Position = UDim2.new(rel, 0, 0.5, 0) }, 0.06)
         if callback then callback(value) end
     end
     local sliding = false
@@ -504,75 +459,69 @@ local function addSlider(parent, labelText, min, max, default, callback, decimal
     return row
 end
 
-local function addButton(parent, labelText, primary, callback)
+local function addButton(parent, label, primary, callback)
     local holder = make("Frame", {
-        Size = UDim2.new(1, 0, 0, 38),
-        BackgroundColor3 = primary and THEME.Accent or THEME.Surface,
-        BorderSizePixel = 0, LayoutOrder = order(),
+        Size = UDim2.new(1, 0, 0, 42),
+        BackgroundColor3 = primary and THEME.Accent or THEME.Card,
+        LayoutOrder = order(),
     }, parent)
-    round(holder, 10)
+    round(holder, 12)
     if primary then
         accentGradient(holder, 20)
     else
-        stroke(holder, THEME.Card, 1, 0.3)
+        stroke(holder, THEME.White, 1, 0.8)
     end
     local b = make("TextButton", {
         Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
-        Text = labelText, TextColor3 = THEME.Text, TextSize = 13,
-        Font = Enum.Font.GothamMedium, AutoButtonColor = false,
+        Text = label, TextColor3 = THEME.White, TextSize = 14,
+        Font = Enum.Font.GothamBold, AutoButtonColor = false,
     }, holder)
     b.MouseEnter:Connect(function()
-        if not primary then tween(holder, { BackgroundColor3 = THEME.Card }) end
+        if not primary then tween(holder, { BackgroundColor3 = THEME.Off }) end
     end)
     b.MouseLeave:Connect(function()
-        if not primary then tween(holder, { BackgroundColor3 = THEME.Surface }) end
+        if not primary then tween(holder, { BackgroundColor3 = THEME.Card }) end
     end)
     b.Activated:Connect(function()
-        tween(holder, { Size = UDim2.new(1, -6, 0, 34) }, 0.08)
+        tween(holder, { Size = UDim2.new(1, -8, 0, 38) }, 0.08)
         task.delay(0.09, function()
-            tween(holder, { Size = UDim2.new(1, 0, 0, 38) }, 0.2, Enum.EasingStyle.Back)
+            tween(holder, { Size = UDim2.new(1, 0, 0, 42) }, 0.2, Enum.EasingStyle.Back)
         end)
         if callback then task.spawn(callback) end
     end)
     return holder
 end
 
--- NOTIFY (toast FOV Studio canto inferior direito)
 local function notify(msg)
     local toast = make("Frame", {
-        AnchorPoint = Vector2.new(1, 1),
-        Position = UDim2.new(1, -16, 1, 60),
-        Size = UDim2.fromOffset(260, 44),
-        BackgroundColor3 = THEME.Surface,
-        BorderSizePixel = 0, ZIndex = 500,
+        AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, -70),
+        Size = UDim2.fromOffset(280, 46), BackgroundColor3 = THEME.Card, ZIndex = 200,
     }, gui)
-    round(toast, 10)
-    local st = stroke(toast, THEME.Card, 1, 0.3)
-    local bar = make("Frame", {
-        Position = UDim2.fromOffset(0, 9),
-        Size = UDim2.fromOffset(3, 26),
-        BackgroundColor3 = THEME.Accent, BorderSizePixel = 0,
+    round(toast, 14)
+    local st = stroke(toast, THEME.Accent, 2, 0.2)
+    local accentBar = make("Frame", {
+        Position = UDim2.fromOffset(10, 10), Size = UDim2.new(0, 4, 1, -20),
+        BackgroundColor3 = THEME.Accent, ZIndex = 201,
     }, toast)
-    round(bar, 2)
-    themed(function() bar.BackgroundColor3 = THEME.Accent; st.Color = THEME.Accent end)
+    round(accentBar, 2)
+    themed(function()
+        accentBar.BackgroundColor3 = THEME.Accent
+        st.Color = THEME.Accent
+    end)
     make("TextLabel", {
-        BackgroundTransparency = 1, Position = UDim2.fromOffset(14, 0),
-        Size = UDim2.new(1, -22, 1, 0), Text = msg,
-        TextColor3 = THEME.Text, TextSize = 13, Font = Enum.Font.GothamBold,
-        TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 501,
+        BackgroundTransparency = 1, Position = UDim2.fromOffset(26, 0),
+        Size = UDim2.new(1, -34, 1, 0), Text = msg,
+        TextColor3 = THEME.Text, TextSize = 14, Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 201,
     }, toast)
-    tween(toast, { Position = UDim2.new(1, -16, 1, -16) }, 0.4, Enum.EasingStyle.Back)
+    tween(toast, { Position = UDim2.new(0.5, 0, 0, 20) }, 0.45, Enum.EasingStyle.Back)
     task.delay(2.2, function()
-        if not toast.Parent then return end
-        tween(toast, { Position = UDim2.new(1, -16, 1, 60) }, 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        tween(toast, { Position = UDim2.new(0.5, 0, 0, -70) }, 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
         task.wait(0.35)
         toast:Destroy()
     end)
 end
 
--- ==========================================================
---  🧠 LÓGICA (idêntica v3.3)
--- ==========================================================
 local NEUTRAL_COLORS = {
     ["Medium stone grey"]=true, ["Medium Stone Grey"]=true,
     ["Institutional white"]=true, ["White"]=true,
@@ -627,19 +576,25 @@ local function IsAliveHumanoid(h)
     return true
 end
 
+-- ==========================================================
+--  🎯 AIM (Players + NPCs) — MAIS PRÓXIMO
+-- ==========================================================
 local ACONFIG = {
     EnabledPlayers=false, EnabledNPCs=false,
     MaxDistance=5000, FOV=360, TeamCheck=true,
     Prediction=false, PredictionSpeed=400, Smoothness=0,
     AutoFire=false, AFCooldownMin=0.08, AFCooldownMax=0.15, AFMinDot=0.85,
-    WeightDistance=10.0,
-    WeightAngle=0.05,
-    SwitchMargin=0,
+    WeightDistance=10.0,   -- distância domina
+    WeightAngle=0.05,      -- ângulo quase não conta
+    SwitchMargin=0,        -- 0 = troca pro mais próximo na hora
     MaxLockTime=999,
     OnlyZombies=false,
     NPCTeamCheck=false,
 }
 
+-- ==========================================================
+--  ✨ AIM ASSIST
+-- ==========================================================
 local ASSIST = {
     Enabled = false, Strength = 0.35, FOV = 90, MaxDistance = 800,
     TeamCheck = true, Prediction = false, PredictionSpeed = 400, SmoothStrength = 6,
@@ -736,6 +691,9 @@ local function RefreshNPCCache()
 end
 local function GetAllNPCs() RefreshNPCCache(); return NPC_CACHE end
 
+-- ==========================================================
+--  🔑 TEAM CHECK DE NPC
+-- ==========================================================
 local NPC_TEAM_KEYWORDS = {
     ["red"]="RED",["blue"]="BLUE",["green"]="GREEN",["yellow"]="YELLOW",
     ["team1"]="T1",["team2"]="T2",["team3"]="T3",["team4"]="T4",
@@ -937,6 +895,9 @@ local function AssistFindTarget()
     return best, bestPart
 end
 
+-- ==========================================================
+--  🔥 UpdateLock — SEMPRE O MAIS PRÓXIMO
+-- ==========================================================
 local function UpdateLock()
     local myChar = player.Character
     if not myChar then
@@ -951,12 +912,15 @@ local function UpdateLock()
         return
     end
 
+    -- ============ AIM PLAYERS + NPCs ============
     if ACONFIG.EnabledPlayers or ACONFIG.EnabledNPCs then
         local now = tick()
+
         local best, bestPart, _, bestDist, bestKind = FindBestTarget()
 
         if best and bestPart then
             local shouldSwitch = false
+
             if not lockTarget then
                 shouldSwitch = true
             elseif best ~= lockTarget then
@@ -998,6 +962,7 @@ local function UpdateLock()
         return
     end
 
+    -- ============ AIM ASSIST ============
     if ASSIST.Enabled then
         assistTarget, assistPart = AssistFindTarget()
         if assistTarget and assistPart then
@@ -1036,7 +1001,9 @@ local function MaybeClearLock()
     assistTarget, assistPart = nil, nil
 end
 
--- VOO
+-- ==========================================================
+--  🚀 VOO
+-- ==========================================================
 local FlyEnabled    = false
 local FlySpeed      = 60
 local FlyConnection = nil
@@ -1047,10 +1014,12 @@ local function GetRootPart()
     local c = player.Character
     return c and c:FindFirstChild("HumanoidRootPart")
 end
+
 local function RemoveFlyParts()
     if BodyVelocity then pcall(function() BodyVelocity:Destroy() end) BodyVelocity = nil end
     if BodyForce then pcall(function() BodyForce:Destroy() end) BodyForce = nil end
 end
+
 local function StartFly()
     if FlyEnabled then return end
     FlyEnabled = true
@@ -1090,6 +1059,7 @@ local function StartFly()
         BodyVelocity.Velocity = BodyVelocity.Velocity:Lerp(vel, 0.15)
     end)
 end
+
 local function StopFly()
     if not FlyEnabled then return end
     FlyEnabled = false
@@ -1098,19 +1068,27 @@ local function StopFly()
 end
 
 player.CharacterAdded:Connect(function()
-    if FlyEnabled then task.wait(0.5); RemoveFlyParts(); StartFly() end
+    if FlyEnabled then
+        task.wait(0.5)
+        RemoveFlyParts()
+        StartFly()
+    end
 end)
 
--- SPEED
+-- ==========================================================
+--  ⚡ SPEED / JUMP / FOV
+-- ==========================================================
 local ConfigState = {
     SpeedEnabled = false, SpeedValue = 16,
     JumpEnabled  = false, JumpValue  = 50,
     FOVEnabled   = false, FOVValue   = 70,
 }
+
 local function GetHumanoid()
     local c = player.Character
     return c and c:FindFirstChildOfClass("Humanoid")
 end
+
 local SpeedPropConn = nil
 local function ApplySpeed()
     local hum = GetHumanoid()
@@ -1164,9 +1142,12 @@ player.CharacterAdded:Connect(function(char)
     end
 end)
 
--- NOCLIP
+-- ==========================================================
+--  🧱 NOCLIP
+-- ==========================================================
 local NoclipEnabled = false
 local NoclipConn    = nil
+
 local function NoclipApplyToChar(char)
     if not char then return end
     for _, p in ipairs(char:GetDescendants()) do
@@ -1175,6 +1156,7 @@ local function NoclipApplyToChar(char)
         end
     end
 end
+
 local function NoclipStart()
     if NoclipConn then NoclipConn:Disconnect() end
     NoclipConn = RunService.Stepped:Connect(function()
@@ -1188,6 +1170,7 @@ local function NoclipStart()
         end
     end)
 end
+
 local function NoclipStop()
     if NoclipConn then NoclipConn:Disconnect() NoclipConn = nil end
     local char = player.Character
@@ -1199,14 +1182,22 @@ local function NoclipStop()
         end
     end
 end
+
 player.CharacterAdded:Connect(function(char)
-    if NoclipEnabled then task.wait(0.2); NoclipApplyToChar(char); NoclipStart() end
+    if NoclipEnabled then
+        task.wait(0.2)
+        NoclipApplyToChar(char)
+        NoclipStart()
+    end
 end)
 
--- FULLBRIGHT
+-- ==========================================================
+--  🔦 FULLBRIGHT
+-- ==========================================================
 local FullbrightEnabled = false
 local FullbrightConns   = {}
 local FullbrightBackup  = nil
+
 local function SaveOriginalLighting()
     FullbrightBackup = {
         Ambient = Lighting.Ambient, OutdoorAmbient = Lighting.OutdoorAmbient,
@@ -1232,6 +1223,7 @@ local function SaveOriginalLighting()
         end
     end
 end
+
 local function FullbrightApply()
     if not FullbrightBackup then SaveOriginalLighting() end
     Lighting.Ambient = Color3.fromRGB(130,130,130)
@@ -1251,6 +1243,7 @@ local function FullbrightApply()
         elseif ef:IsA("SunRaysEffect") then ef.Intensity=0 end
     end
 end
+
 local function FullbrightStart()
     FullbrightApply()
     for _, c in ipairs(FullbrightConns) do if c and c.Disconnect then pcall(function() c:Disconnect() end) end end
@@ -1262,6 +1255,7 @@ local function FullbrightStart()
         if FullbrightEnabled and Lighting.Brightness < 1.5 then Lighting.Brightness = 2 end
     end))
 end
+
 local function FullbrightStop()
     for _, c in ipairs(FullbrightConns) do if c and c.Disconnect then pcall(function() c:Disconnect() end) end end
     FullbrightConns = {}
@@ -1284,23 +1278,46 @@ local function FullbrightStop()
     end
 end
 
--- ESP
+-- ==========================================================
+--  👁️ ESP
+-- ==========================================================
 local ESP_CONFIG = {
-    Enabled = true, Skeleton = true, Box = false, Distance = true, Name = true,
-    TeamCheck = true, Color = Color3.fromRGB(255, 30, 30),
-    MaxDistance = 1500, TextSize = 12, Thickness = 1,
+    Enabled = true,
+    Skeleton = true,
+    Box = false,
+    Distance = true,
+    Name = true,
+    TeamCheck = true,
+    Color = Color3.fromRGB(255, 30, 30),
+    MaxDistance = 1500,
+    TextSize = 12,
+    Thickness = 1,
 }
+
 local SKELETON_R15 = {
-    {"Head", "UpperTorso"},{"UpperTorso", "LowerTorso"},
-    {"UpperTorso", "LeftUpperArm"},{"LeftUpperArm", "LeftLowerArm"},{"LeftLowerArm", "LeftHand"},
-    {"UpperTorso", "RightUpperArm"},{"RightUpperArm", "RightLowerArm"},{"RightLowerArm", "RightHand"},
-    {"LowerTorso", "LeftUpperLeg"},{"LeftUpperLeg", "LeftLowerLeg"},{"LeftLowerLeg", "LeftFoot"},
-    {"LowerTorso", "RightUpperLeg"},{"RightUpperLeg", "RightLowerLeg"},{"RightLowerLeg", "RightFoot"},
+    {"Head", "UpperTorso"},
+    {"UpperTorso", "LowerTorso"},
+    {"UpperTorso", "LeftUpperArm"},
+    {"LeftUpperArm", "LeftLowerArm"},
+    {"LeftLowerArm", "LeftHand"},
+    {"UpperTorso", "RightUpperArm"},
+    {"RightUpperArm", "RightLowerArm"},
+    {"RightLowerArm", "RightHand"},
+    {"LowerTorso", "LeftUpperLeg"},
+    {"LeftUpperLeg", "LeftLowerLeg"},
+    {"LeftLowerLeg", "LeftFoot"},
+    {"LowerTorso", "RightUpperLeg"},
+    {"RightUpperLeg", "RightLowerLeg"},
+    {"RightLowerLeg", "RightFoot"},
 }
 local SKELETON_R6 = {
-    {"Head", "Torso"},{"Torso", "Left Arm"},{"Torso", "Right Arm"},
-    {"Torso", "Left Leg"},{"Torso", "Right Leg"},
+    {"Head", "Torso"},
+    {"Torso", "Left Arm"},
+    {"Torso", "Right Arm"},
+    {"Torso", "Left Leg"},
+    {"Torso", "Right Leg"},
 }
+
 local ESP_DRAWS = {}
 local ESP_MAX_LINES = 20
 
@@ -1335,20 +1352,25 @@ end
 
 local function ESPCreateDraw(plr, char)
     ESPRemoveDraw(plr)
-    local draw = { char = char, plr = plr, skeleton = {}, box = {}, name = nil, dist = nil }
+    local draw = {
+        char = char, plr = plr,
+        skeleton = {}, box = {}, name = nil, dist = nil,
+    }
     for i = 1, ESP_MAX_LINES do
-        draw.skeleton[i] = make("Frame", {
+        local f = make("Frame", {
             BackgroundColor3 = ESP_CONFIG.Color,
             BorderSizePixel = 0, Visible = false, ZIndex = 20,
             AnchorPoint = Vector2.new(0.5, 0.5),
         }, gui)
+        draw.skeleton[i] = f
     end
     for i = 1, 4 do
-        draw.box[i] = make("Frame", {
+        local f = make("Frame", {
             BackgroundColor3 = ESP_CONFIG.Color,
             BorderSizePixel = 0, Visible = false, ZIndex = 19,
             AnchorPoint = Vector2.new(0.5, 0.5),
         }, gui)
+        draw.box[i] = f
     end
     draw.name = make("TextLabel", {
         BackgroundTransparency = 1, TextColor3 = ESP_CONFIG.Color,
@@ -1384,6 +1406,7 @@ local function DrawLine2D(frame, p1, p2, color, thickness)
         return
     end
     local center = (p1 + p2) * 0.5
+    -- ✅ FIX: math.atan em vez de math.atan2
     local angle = math.deg(math.atan(diff.Y, diff.X))
     frame.Visible = true
     frame.Position = UDim2.fromOffset(center.X, center.Y)
@@ -1396,17 +1419,25 @@ local function ESPUpdateDraw(draw)
     local plr = draw.plr
     local char = plr.Character
     if not char or char ~= draw.char or not ESPIsEnemy(plr) then
-        ESPHideAll(draw); return
+        ESPHideAll(draw)
+        return
     end
     local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then ESPHideAll(draw); return end
+    if not hrp then
+        ESPHideAll(draw)
+        return
+    end
     local camPos = Camera.CFrame.Position
     local dist = (hrp.Position - camPos).Magnitude
-    if dist > ESP_CONFIG.MaxDistance then ESPHideAll(draw); return end
+    if dist > ESP_CONFIG.MaxDistance then
+        ESPHideAll(draw)
+        return
+    end
     local camLook = Camera.CFrame.LookVector
     local toChar = hrp.Position - camPos
     if toChar.Magnitude > 0.01 and toChar.Unit:Dot(camLook) < -0.1 then
-        ESPHideAll(draw); return
+        ESPHideAll(draw)
+        return
     end
 
     local color = ESP_CONFIG.Color
@@ -1552,9 +1583,11 @@ local function ESPApplyColor(newColor)
         if d.dist then d.dist.TextColor3 = newColor end
     end
 end
+
 local function ESPClearAll()
     for plr, _ in pairs(ESP_DRAWS) do ESPRemoveDraw(plr) end
 end
+
 local function ESPUpdateTeamCheck()
     for plr, _ in pairs(ESP_DRAWS) do
         if not ESPIsEnemy(plr) then ESPRemoveDraw(plr) end
@@ -1562,7 +1595,9 @@ local function ESPUpdateTeamCheck()
     ESPRefresh()
 end
 
--- TP
+-- ==========================================================
+--  📍 TP
+-- ==========================================================
 local TPPoints = {}
 local function TeleportTo(pos)
     local c = player.Character
@@ -1575,9 +1610,12 @@ local function TeleportTo(pos)
     return true
 end
 
--- AUTO CLICK
+-- ==========================================================
+--  🖱️ AUTO CLICKER
+-- ==========================================================
 local AutoClick = { Enabled=false, CPS=30, Thread=nil, Touching=false, BubbleVisible=false }
 local AC_BUBBLE = 80
+
 local acBubble = make("Frame", {
     Name = "AutoClickBubble", Size = UDim2.fromOffset(AC_BUBBLE, AC_BUBBLE),
     Position = UDim2.fromOffset(200, 300), BackgroundColor3 = Color3.fromRGB(239, 68, 68),
@@ -1616,6 +1654,7 @@ local function ACStartClickLoop()
     end)
 end
 local function ACStopClickLoop() AutoClick.Touching = false end
+
 local function ACShowBubble(show)
     AutoClick.BubbleVisible = show
     if show then
@@ -1673,11 +1712,11 @@ connect(UserInputService.InputEnded, function(input)
 end)
 
 -- ==========================================================
---  📄 ABAS (idênticas v3.3)
+--  🎯 ABA AIM — MAIS PRÓXIMO
 -- ==========================================================
 local aimTab = newTab("Aim", "🎯", 1)
-text(aimTab, "Aimbot Players (mais próximo)", 18, THEME.Text, Enum.Font.GothamBold)
-text(aimTab, "Trava no mais perto. Troca sozinho se outro ficar mais perto.", 11, THEME.SubText)
+text(aimTab, "Aimbot Players (mais próximo)", 20, THEME.Text, Enum.Font.GothamBold)
+text(aimTab, "Trava no mais perto. Troca sozinho se outro ficar mais perto.", 12, THEME.SubText)
 
 addToggle(aimTab, "🎯 Ativar Aim 100% em Players", false, function(v)
     ACONFIG.EnabledPlayers = v
@@ -1691,12 +1730,18 @@ addToggle(aimTab, "🎯 Ignorar ângulo (pega atrás)", true, function(v)
     ACONFIG.WeightAngle = v and 0.05 or 1.0
     notify(v and "🎯 Pega em qualquer direção" or "🎯 Só na mira")
 end)
+
 addSlider(aimTab, "FOV (graus)", 5, 360, 360, function(v) ACONFIG.FOV = v end)
 addSlider(aimTab, "Distância máx", 20, 8000, 5000, function(v) ACONFIG.MaxDistance = v end)
 addSlider(aimTab, "Velocidade da bala", 50, 3000, 400, function(v) ACONFIG.PredictionSpeed = v end)
 addSlider(aimTab, "Suavidade (0 = colado)", 0, 1, 0, function(v) ACONFIG.Smoothness = v end, 2)
-addSlider(aimTab, "Prioridade por distância", 1, 20, 10, function(v) ACONFIG.WeightDistance = v end)
-addSlider(aimTab, "Tolerância de troca (studs)", 0, 100, 0, function(v) ACONFIG.SwitchMargin = v end)
+addSlider(aimTab, "Prioridade por distância", 1, 20, 10, function(v)
+    ACONFIG.WeightDistance = v
+end)
+addSlider(aimTab, "Tolerância de troca (studs)", 0, 100, 0, function(v)
+    ACONFIG.SwitchMargin = v
+end)
+
 addButton(aimTab, "🔄 Recontar alvos agora", true, function()
     lockTarget, lockPart, lockKind = nil, nil, nil
     AIM_LAST_SWITCH = 0
@@ -1704,9 +1749,12 @@ addButton(aimTab, "🔄 Recontar alvos agora", true, function()
     notify("🔄 Vai escolher o mais próximo no próximo frame")
 end)
 
+-- ==========================================================
+--  ✨ ABA AIM ASSIST
+-- ==========================================================
 local assistTab = newTab("Assist", "✨", 2)
-text(assistTab, "Aim Assist (suave)", 18, THEME.Text, Enum.Font.GothamBold)
-text(assistTab, "Puxa a mira suavemente.", 11, THEME.SubText)
+text(assistTab, "Aim Assist (suave)", 20, THEME.Text, Enum.Font.GothamBold)
+text(assistTab, "Puxa a mira suavemente.", 12, THEME.SubText)
 addToggle(assistTab, "✨ Ativar Aim Assist", false, function(v)
     ASSIST.Enabled = v
     notify(v and "✨ Assist ON" or "Assist OFF")
@@ -1718,9 +1766,12 @@ addSlider(assistTab, "FOV", 5, 360, 90, function(v) ASSIST.FOV = v end)
 addSlider(assistTab, "Distância máx", 50, 5000, 800, function(v) ASSIST.MaxDistance = v end)
 addSlider(assistTab, "Reajuste (suavidade)", 1, 30, 6, function(v) ASSIST.SmoothStrength = v end)
 
+-- ==========================================================
+--  👹 ABA AIM NPC
+-- ==========================================================
 local npcTab = newTab("Aim NPC", "👹", 3)
-text(npcTab, "Aimbot NPCs", 18, THEME.Text, Enum.Font.GothamBold)
-text(npcTab, "Cola em NPCs / zumbis / bonecos.", 11, THEME.SubText)
+text(npcTab, "Aimbot NPCs", 20, THEME.Text, Enum.Font.GothamBold)
+text(npcTab, "Cola em NPCs / zumbis / bonecos.", 12, THEME.SubText)
 addToggle(npcTab, "👹 Ativar Aim 100% em NPCs", false, function(v)
     ACONFIG.EnabledNPCs = v
     MaybeClearLock()
@@ -1750,9 +1801,12 @@ addButton(npcTab, "🔍 Contar NPCs", true, function()
     end
 end)
 
+-- ==========================================================
+--  ⚡ ABA SPEED
+-- ==========================================================
 local spdTab = newTab("Speed", "⚡", 4)
-text(spdTab, "Speed / Pulo / FOV", 18, THEME.Text, Enum.Font.GothamBold)
-text(spdTab, "Ajustes persistentes.", 11, THEME.SubText)
+text(spdTab, "Speed / Pulo / FOV", 20, THEME.Text, Enum.Font.GothamBold)
+text(spdTab, "Ajustes persistentes.", 12, THEME.SubText)
 addToggle(spdTab, "⚡ Ativar Speed", false, function(v)
     ConfigState.SpeedEnabled = v
     local hum = GetHumanoid()
@@ -1788,9 +1842,12 @@ addSlider(spdTab, "FOV da câmera", 40, 120, 70, function(v)
     if ConfigState.FOVEnabled and Camera then Camera.FieldOfView = v end
 end)
 
+-- ==========================================================
+--  👁️ ABA ESP
+-- ==========================================================
 local espTab = newTab("ESP", "👁️", 5)
-text(espTab, "ESP Melhorado", 18, THEME.Text, Enum.Font.GothamBold)
-text(espTab, "Ative só o que quiser ver.", 11, THEME.SubText)
+text(espTab, "ESP Melhorado", 20, THEME.Text, Enum.Font.GothamBold)
+text(espTab, "Ative só o que quiser ver.", 12, THEME.SubText)
 
 addToggle(espTab, "👁️ Ativar ESP", true, function(v)
     ESP_CONFIG.Enabled = v
@@ -1798,7 +1855,8 @@ addToggle(espTab, "👁️ Ativar ESP", true, function(v)
     notify(v and "👁️ ESP ON" or "ESP OFF")
 end)
 
-text(espTab, "🎯 O QUE MOSTRAR", 11, THEME.SubText, Enum.Font.GothamBold)
+text(espTab, "🎯 O QUE MOSTRAR", 12, THEME.SubText, Enum.Font.GothamBold)
+
 addToggle(espTab, "🦴 Esqueleto (ossos)", true, function(v)
     ESP_CONFIG.Skeleton = v
     notify(v and "🦴 Esqueleto ON" or "Esqueleto OFF")
@@ -1815,14 +1873,18 @@ addToggle(espTab, "📏 Distância", true, function(v)
     ESP_CONFIG.Distance = v
     notify(v and "📏 Distância ON" or "Distância OFF")
 end)
+
 addToggle(espTab, "🛡️ Só time inimigo", true, function(v)
     ESP_CONFIG.TeamCheck = v
     ESPUpdateTeamCheck()
     notify(v and "🛡️ Team Check ON" or "Team Check OFF")
 end)
 
-text(espTab, "⚙️ AJUSTES", 11, THEME.SubText, Enum.Font.GothamBold)
-addSlider(espTab, "Distância máx (studs)", 50, 5000, 1500, function(v) ESP_CONFIG.MaxDistance = v end)
+text(espTab, "⚙️ AJUSTES", 12, THEME.SubText, Enum.Font.GothamBold)
+
+addSlider(espTab, "Distância máx (studs)", 50, 5000, 1500, function(v)
+    ESP_CONFIG.MaxDistance = v
+end)
 addSlider(espTab, "Tamanho do texto", 8, 24, 12, function(v)
     ESP_CONFIG.TextSize = v
     for _, d in pairs(ESP_DRAWS) do
@@ -1830,9 +1892,12 @@ addSlider(espTab, "Tamanho do texto", 8, 24, 12, function(v)
         if d.dist then d.dist.TextSize = v end
     end
 end)
-addSlider(espTab, "Espessura das linhas", 1, 5, 1, function(v) ESP_CONFIG.Thickness = v end)
+addSlider(espTab, "Espessura das linhas", 1, 5, 1, function(v)
+    ESP_CONFIG.Thickness = v
+end)
 
-text(espTab, "🎨 COR DO ESP", 11, THEME.SubText, Enum.Font.GothamBold)
+text(espTab, "🎨 COR DO ESP", 12, THEME.SubText, Enum.Font.GothamBold)
+
 local colorCard = card(espTab, 130)
 make("UIPadding", { PaddingTop=UDim.new(0,10), PaddingLeft=UDim.new(0,10), PaddingRight=UDim.new(0,10), PaddingBottom=UDim.new(0,10) }, colorCard)
 make("UIGridLayout", { CellSize=UDim2.new(1/4,-6,0,44), CellPadding=UDim2.fromOffset(8,8), SortOrder=Enum.SortOrder.LayoutOrder }, colorCard)
@@ -1842,13 +1907,14 @@ for i, preset in ipairs(ESP_COLORS) do
     local name, c = preset[1], preset[2]
     local sw = make("Frame", { BackgroundColor3 = c, LayoutOrder = i }, colorCard)
     round(sw, 10)
-    local sst = stroke(sw, THEME.White, 2, 1)
+    local sst = stroke(sw, THEME.White, 3, 1)
     colorStrokes[i] = sst
+
     local btn = make("TextButton", {
         Size = UDim2.fromScale(1,1), BackgroundTransparency = 1,
         Text = name, TextColor3 = Color3.new(1,1,1),
         TextStrokeTransparency = 0.3, TextStrokeColor3 = Color3.new(0,0,0),
-        TextSize = 10, Font = Enum.Font.GothamBold, AutoButtonColor = false,
+        TextSize = 11, Font = Enum.Font.GothamBold, AutoButtonColor = false,
     }, sw)
     btn.Activated:Connect(function()
         ESPApplyColor(c)
@@ -1860,35 +1926,47 @@ for i, preset in ipairs(ESP_COLORS) do
 end
 colorStrokes[1].Transparency = 0
 
+-- ==========================================================
+--  🧱 ABA NOCLIP
+-- ==========================================================
 local noclipTab = newTab("Noclip", "🧱", 6)
-text(noclipTab, "Noclip", 18, THEME.Text, Enum.Font.GothamBold)
-text(noclipTab, "Atravessa paredes.", 11, THEME.SubText)
+text(noclipTab, "Noclip", 20, THEME.Text, Enum.Font.GothamBold)
+text(noclipTab, "Atravessa paredes.", 12, THEME.SubText)
 addToggle(noclipTab, "🧱 Ativar Noclip", false, function(v)
     NoclipEnabled = v
     if v then NoclipStart(); NoclipApplyToChar(player.Character); notify("Noclip ON")
     else NoclipStop(); notify("Noclip OFF") end
 end)
 
+-- ==========================================================
+--  🚀 ABA VOO
+-- ==========================================================
 local vooTab = newTab("Voo", "🚀", 7)
-text(vooTab, "Voo", 18, THEME.Text, Enum.Font.GothamBold)
-text(vooTab, "Voe livre.", 11, THEME.SubText)
+text(vooTab, "Voo", 20, THEME.Text, Enum.Font.GothamBold)
+text(vooTab, "Voe livre.", 12, THEME.SubText)
 addToggle(vooTab, "🚀 Ativar Voo", false, function(v)
     if v then StartFly(); notify("Voo ON") else StopFly(); notify("Voo OFF") end
 end)
 addSlider(vooTab, "Velocidade do Voo", 20, 800, 60, function(v) FlySpeed = v end)
 
+-- ==========================================================
+--  🔦 ABA FULLBRIGHT
+-- ==========================================================
 local fullTab = newTab("Fullbright", "🔦", 8)
-text(fullTab, "Fullbright", 18, THEME.Text, Enum.Font.GothamBold)
-text(fullTab, "Clareia o mapa.", 11, THEME.SubText)
+text(fullTab, "Fullbright", 20, THEME.Text, Enum.Font.GothamBold)
+text(fullTab, "Clareia o mapa.", 12, THEME.SubText)
 addToggle(fullTab, "🔦 Ativar Fullbright", false, function(v)
     FullbrightEnabled = v
     if v then FullbrightStart(); notify("Fullbright ON")
     else FullbrightStop(); notify("Fullbright OFF") end
 end)
 
+-- ==========================================================
+--  📍 ABA TP
+-- ==========================================================
 local tpTab = newTab("TP", "📍", 9)
-text(tpTab, "Teleportes", 18, THEME.Text, Enum.Font.GothamBold)
-text(tpTab, "Salve pontos e volte pra eles.", 11, THEME.SubText)
+text(tpTab, "Teleportes", 20, THEME.Text, Enum.Font.GothamBold)
+text(tpTab, "Salve pontos e volte pra eles.", 12, THEME.SubText)
 addButton(tpTab, "📍 Salvar Posição Atual", true, function()
     local c = player.Character
     local r = c and c:FindFirstChild("HumanoidRootPart")
@@ -1924,7 +2002,7 @@ _G.RefreshTPList = function()
         for i, p in ipairs(TPPoints) do
             local row = make("Frame", { Size = UDim2.new(1,0,0,38), BackgroundColor3 = THEME.Card, LayoutOrder = i }, savedHolder)
             round(row, 10); stroke(row, THEME.White, 1, 0.85)
-            make("TextLabel", {
+            local lbl = make("TextLabel", {
                 Size = UDim2.new(1,-110,1,0), Position = UDim2.fromOffset(12,0),
                 BackgroundTransparency = 1, Text = p.name, TextColor3 = THEME.Text,
                 TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.GothamMedium, TextSize = 12,
@@ -1950,9 +2028,12 @@ _G.RefreshTPList = function()
 end
 _G.RefreshTPList()
 
+-- ==========================================================
+--  🖱️ ABA AUTO CLICK
+-- ==========================================================
 local acTab = newTab("Auto Click", "🖱️", 10)
-text(acTab, "Auto Click com Bolinha", 18, THEME.Text, Enum.Font.GothamBold)
-text(acTab, "Ativa → bolinha pra arrastar e segurar.", 11, THEME.SubText)
+text(acTab, "Auto Click com Bolinha", 20, THEME.Text, Enum.Font.GothamBold)
+text(acTab, "Ativa → bolinha pra arrastar e segurar.", 12, THEME.SubText)
 addToggle(acTab, "🖱️ Ativar Auto Click", false, function(v)
     AutoClick.Enabled = v
     if v then ACShowBubble(true); notify("👆 Bolinha apareceu!")
@@ -1964,10 +2045,13 @@ addSlider(acTab, "CPS", 1, 500, 30, function(v) AutoClick.CPS = v end)
 addButton(acTab, "🔥 MODO INSANO (300 CPS)", true, function() AutoClick.CPS = 300; notify("🔥 CPS 300") end)
 addButton(acTab, "⚡ MODO TURBO (500 CPS)", false, function() AutoClick.CPS = 500; notify("⚡ CPS 500") end)
 
+-- ==========================================================
+--  ⚙️ ABA CONFIG
+-- ==========================================================
 local cfgTab = newTab("Config", "⚙️", 11)
-text(cfgTab, "Config", 18, THEME.Text, Enum.Font.GothamBold)
-text(cfgTab, "Personalize o painel.", 11, THEME.SubText)
-text(cfgTab, "🎨 COR DA INTERFACE", 11, THEME.SubText, Enum.Font.GothamBold)
+text(cfgTab, "Config", 20, THEME.Text, Enum.Font.GothamBold)
+text(cfgTab, "Personalize o painel.", 12, THEME.SubText)
+text(cfgTab, "🎨 COR DA INTERFACE", 12, THEME.SubText, Enum.Font.GothamBold)
 local themeCard = card(cfgTab, 132)
 make("UIPadding", { PaddingTop=UDim.new(0,10), PaddingLeft=UDim.new(0,10), PaddingRight=UDim.new(0,10), PaddingBottom=UDim.new(0,10) }, themeCard)
 make("UIGridLayout", { CellSize=UDim2.new(1/3,-6,0,50), CellPadding=UDim2.fromOffset(8,8), SortOrder=Enum.SortOrder.LayoutOrder }, themeCard)
@@ -1990,17 +2074,17 @@ for i, preset in ipairs(PRESETS) do
         notify("Tema " .. name)
     end)
 end
-text(cfgTab, "📏 PAINEL", 11, THEME.SubText, Enum.Font.GothamBold)
+text(cfgTab, "📏 PAINEL", 12, THEME.SubText, Enum.Font.GothamBold)
 addSlider(cfgTab, "Escala (%)", 60, 130, 100, function(v) PanelScaleMult = v/100; updateFit() end)
 addSlider(cfgTab, "Transparência (%)", 0, 60, 0, function(v) main.BackgroundTransparency = v/100 end)
-text(cfgTab, "✨ COMPORTAMENTO", 11, THEME.SubText, Enum.Font.GothamBold)
+text(cfgTab, "✨ COMPORTAMENTO", 12, THEME.SubText, Enum.Font.GothamBold)
 addToggle(cfgTab, "✨ Animações", true, function(v) AnimEnabled = v; notify(v and "Animações ON" or "Animações OFF") end)
 addToggle(cfgTab, "👤 Mostrar perfil", true, function(v) profile.Visible = v end)
 
 selectTab("Aim")
 
 -- ==========================================================
---  🔵 BOLINHA
+--  🔵 BOLINHA DO PAINEL
 -- ==========================================================
 local bubble = make("Frame", {
     Name = "Bubble", Size = UDim2.fromOffset(BUBBLE, BUBBLE),
@@ -2031,11 +2115,12 @@ TweenService:Create(ringStroke, ringInfo, { Transparency = 1 }):Play()
 
 local hit = make("TextButton", {
     Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
-    Text = "💀", TextColor3 = THEME.White, TextSize = 28,
+    Text = "💀", TextColor3 = THEME.White, TextSize = 30,
     Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 51,
 }, bubble)
 
 local isOpen, busy = false, false
+
 local savedMouseBehavior = nil
 local savedMouseIcon = nil
 
@@ -2180,7 +2265,10 @@ player.CharacterAdded:Connect(function()
     ESPRefresh()
 end)
 
+-- Estado inicial
 ESPRefresh()
 showBubble(true)
 
-print("✅ Painel Pro v3.4 — UI FOV Studio + AIM mais próximo")
+print("✅ Painel Pro v3.3 — AIM escolhe SEMPRE o mais próximo")
+print("🎯 Aba AIM: prioridade por distância + tolerância de troca")
+print("🔧 Fix: math.atan (ESP não trava mais)")
