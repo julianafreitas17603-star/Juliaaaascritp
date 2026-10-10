@@ -1,7 +1,6 @@
 -- ==========================================================
---  💀 PAINEL PRO v3.1 — Aim 100% + Aim Assist + Aim NPC + Speed + ESP + Noclip + Voo + Fullbright + TP + AutoClick + Config
---  ✨ NOVO: Aim Assist controlável com a mira
---  ✅ BUG CORRIGIDO — linha travava o BindToRenderStep
+--  💀 PAINEL PRO v3.2 — Aim + Assist + NPC (Team Check) + Speed + ESP MELHORADO + Noclip + Voo + TP + AutoClick + Config
+--  ✨ ESP novo: Esqueleto, Caixa, Nome, Distância (toggles separados)
 -- ==========================================================
 
 repeat task.wait(0.1) until game:IsLoaded()
@@ -64,9 +63,7 @@ end
 
 local function tween(o, p, t, style, dir)
     if not AnimEnabled then
-        for k, v in pairs(p) do
-            pcall(function() o[k] = v end)
-        end
+        for k, v in pairs(p) do pcall(function() o[k] = v end) end
         return nil
     end
     local tw = TweenService:Create(o, TweenInfo.new(t or 0.2, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), p)
@@ -119,6 +116,7 @@ local root = make("Frame", {
     Name = "Root", AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(520, 420),
     BackgroundTransparency = 1, Visible = false,
+    ZIndex = 100,
 }, gui)
 
 local PanelScaleMult = 1.0
@@ -188,7 +186,7 @@ make("TextLabel", {
 make("TextLabel", {
     BackgroundTransparency = 1, Position = UDim2.fromOffset(60, 31),
     Size = UDim2.new(1, -120, 0, 16),
-    Text = "Aim • Assist • NPC • Speed • ESP • Noclip • Voo • TP", TextColor3 = THEME.SubText, TextSize = 11,
+    Text = "Aim • Assist • NPC • ESP Novo • Speed • Voo • TP", TextColor3 = THEME.SubText, TextSize = 11,
     Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left,
 }, top)
 
@@ -497,13 +495,13 @@ end
 local function notify(msg)
     local toast = make("Frame", {
         AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, -70),
-        Size = UDim2.fromOffset(280, 46), BackgroundColor3 = THEME.Card, ZIndex = 20,
+        Size = UDim2.fromOffset(280, 46), BackgroundColor3 = THEME.Card, ZIndex = 200,
     }, gui)
     round(toast, 14)
     local st = stroke(toast, THEME.Accent, 2, 0.2)
     local accentBar = make("Frame", {
         Position = UDim2.fromOffset(10, 10), Size = UDim2.new(0, 4, 1, -20),
-        BackgroundColor3 = THEME.Accent, ZIndex = 21,
+        BackgroundColor3 = THEME.Accent, ZIndex = 201,
     }, toast)
     round(accentBar, 2)
     themed(function()
@@ -514,7 +512,7 @@ local function notify(msg)
         BackgroundTransparency = 1, Position = UDim2.fromOffset(26, 0),
         Size = UDim2.new(1, -34, 1, 0), Text = msg,
         TextColor3 = THEME.Text, TextSize = 14, Font = Enum.Font.GothamBold,
-        TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 21,
+        TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 201,
     }, toast)
     tween(toast, { Position = UDim2.new(0.5, 0, 0, 20) }, 0.45, Enum.EasingStyle.Back)
     task.delay(2.2, function()
@@ -589,20 +587,15 @@ local ACONFIG = {
     SmartSwitch=true, WeightDistance=1.0, WeightAngle=0.35,
     SwitchMargin=3, SwitchCooldown=0.08, MaxLockTime=5,
     OnlyZombies=false,
+    NPCTeamCheck=false,
 }
 
 -- ==========================================================
---  ✨ AIM ASSIST (suave, controlável)
+--  ✨ AIM ASSIST
 -- ==========================================================
 local ASSIST = {
-    Enabled = false,
-    Strength = 0.35,
-    FOV = 90,
-    MaxDistance = 800,
-    TeamCheck = true,
-    Prediction = false,
-    PredictionSpeed = 400,
-    SmoothStrength = 6,
+    Enabled = false, Strength = 0.35, FOV = 90, MaxDistance = 800,
+    TeamCheck = true, Prediction = false, PredictionSpeed = 400, SmoothStrength = 6,
 }
 
 local NPC_CACHE = {}
@@ -696,6 +689,79 @@ local function RefreshNPCCache()
 end
 local function GetAllNPCs() RefreshNPCCache(); return NPC_CACHE end
 
+-- ==========================================================
+--  🔑 TEAM CHECK DE NPC
+-- ==========================================================
+local NPC_TEAM_KEYWORDS = {
+    ["red"]="RED",["blue"]="BLUE",["green"]="GREEN",["yellow"]="YELLOW",
+    ["team1"]="T1",["team2"]="T2",["team3"]="T3",["team4"]="T4",
+    ["team a"]="TA",["team b"]="TB",
+    ["ally"]="ALLY",["allied"]="ALLY",["friendly"]="ALLY",
+    ["enemy"]="ENEMY",["enemies"]="ENEMY",["hostile"]="ENEMY",
+    ["neutral"]="NEUTRAL",
+    ["defender"]="DEF",["defenders"]="DEF",
+    ["attacker"]="ATK",["attackers"]="ATK",
+    ["vermelho"]="RED",["azul"]="BLUE",["verde"]="GREEN",["amarelo"]="YELLOW",
+    ["time1"]="T1",["time2"]="T2",["time3"]="T3",["time4"]="T4",
+    ["aliado"]="ALLY",["aliados"]="ALLY",["amigo"]="ALLY",["amigos"]="ALLY",
+    ["inimigo"]="ENEMY",["inimigos"]="ENEMY",["hostil"]="ENEMY",
+    ["neutro"]="NEUTRAL",
+    ["defensor"]="DEF",["defensores"]="DEF",
+    ["atacante"]="ATK",["atacantes"]="ATK",
+}
+
+local function NameToTeamKey(name)
+    local lower = string.lower(tostring(name))
+    for kw, key in pairs(NPC_TEAM_KEYWORDS) do
+        if string.find(lower, kw, 1, true) then return key end
+    end
+    return nil
+end
+
+local function GetNPCTeamKey(npc)
+    if not npc then return nil end
+    for _, a in ipairs(TEAM_ATTR_NAMES) do
+        local v = npc:GetAttribute(a)
+        if v ~= nil then
+            local key = NameToTeamKey(v)
+            if key then return "A:" .. key end
+            return "A:" .. tostring(v)
+        end
+    end
+    for _, n in ipairs(TEAM_CHILD_NAMES) do
+        local v = npc:FindFirstChild(n)
+        if v and (v:IsA("StringValue") or v:IsA("IntValue") or v:IsA("NumberValue")) then
+            local key = NameToTeamKey(v.Value)
+            if key then return "C:" .. key end
+            return "C:" .. tostring(v.Value)
+        end
+    end
+    local nameKey = NameToTeamKey(npc.Name)
+    if nameKey then return "N:" .. nameKey end
+    local p = npc.Parent
+    local depth = 0
+    while p and p ~= workspace and depth < 4 do
+        local folderKey = NameToTeamKey(p.Name)
+        if folderKey then return "F:" .. folderKey end
+        p = p.Parent
+        depth = depth + 1
+    end
+    for _, tag in ipairs(CollectionService:GetTags(npc)) do
+        local tagKey = NameToTeamKey(tag)
+        if tagKey then return "T:" .. tagKey end
+    end
+    return nil
+end
+
+local function NPCIsEnemy(npc)
+    if not ACONFIG.NPCTeamCheck then return true end
+    local npcKey = GetNPCTeamKey(npc)
+    local myKey  = GetTeamKey(player)
+    if not npcKey or not myKey then return true end
+    local function strip(s) return s:match("^%a+:(.+)$") or s end
+    return strip(npcKey) ~= strip(myKey)
+end
+
 local AIM_LAST_SWITCH = 0
 local AIM_LOCK_START  = 0
 local lockTarget, lockPart, lockKind = nil, nil, nil
@@ -745,7 +811,6 @@ end
 local function FindBestTarget()
     local mp, ml = Camera.CFrame.Position, Camera.CFrame.LookVector
     local best, bestPart, bestScore, bestDist, bestKind = nil, nil, math.huge, nil, nil
-
     if ACONFIG.EnabledPlayers then
         for _, plr in ipairs(Players:GetPlayers()) do
             local part = GetPlayerPart(plr)
@@ -764,26 +829,26 @@ local function FindBestTarget()
             end
         end
     end
-
     if ACONFIG.EnabledNPCs then
         for _, npc in ipairs(GetAllNPCs()) do
-            local part = NPCGetPart(npc)
-            if part then
-                local to = part.Position - mp
-                local d = to.Magnitude
-                if d <= ACONFIG.MaxDistance then
-                    local ang = AngleBetween(ml, to)
-                    if ang <= ACONFIG.FOV then
-                        local score = d * ACONFIG.WeightDistance + ang * ACONFIG.WeightAngle
-                        if score < bestScore then
-                            bestScore, best, bestPart, bestDist, bestKind = score, npc, part, d, "npc"
+            if NPCIsEnemy(npc) then
+                local part = NPCGetPart(npc)
+                if part then
+                    local to = part.Position - mp
+                    local d = to.Magnitude
+                    if d <= ACONFIG.MaxDistance then
+                        local ang = AngleBetween(ml, to)
+                        if ang <= ACONFIG.FOV then
+                            local score = d * ACONFIG.WeightDistance + ang * ACONFIG.WeightAngle
+                            if score < bestScore then
+                                bestScore, best, bestPart, bestDist, bestKind = score, npc, part, d, "npc"
+                            end
                         end
                     end
                 end
             end
         end
     end
-
     return best, bestPart, bestScore, bestDist, bestKind
 end
 
@@ -792,15 +857,11 @@ local function GetDistToTarget()
     return (lockPart.Position - Camera.CFrame.Position).Magnitude
 end
 
--- ==========================================================
---  ✨ AIM ASSIST — função de busca
--- ==========================================================
 local assistTarget, assistPart = nil, nil
 
 local function AssistFindTarget()
     local mp, ml = Camera.CFrame.Position, Camera.CFrame.LookVector
     local best, bestPart, bestDist = nil, nil, math.huge
-
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= player then
             local ok = true
@@ -832,9 +893,6 @@ local function AssistFindTarget()
     return best, bestPart
 end
 
--- ==========================================================
---  UPDATE AIM UNIFICADO
--- ==========================================================
 local function UpdateLock()
     local myChar = player.Character
     if not myChar then
@@ -848,17 +906,13 @@ local function UpdateLock()
         assistTarget, assistPart = nil, nil
         return
     end
-
-    -----------------------------------------------------------------
-    -- 🎯 MODO 1: AIM 100%
-    -----------------------------------------------------------------
     if ACONFIG.EnabledPlayers or ACONFIG.EnabledNPCs then
         if lockTarget then
             local stillOk = false
             if lockKind == "player" then
                 stillOk = IsEnemy(lockTarget) and (GetPlayerPart(lockTarget) ~= nil)
             elseif lockKind == "npc" then
-                stillOk = (lockTarget.Parent ~= nil) and IsNPC(lockTarget) and (NPCGetPart(lockTarget) ~= nil)
+                stillOk = (lockTarget.Parent ~= nil) and IsNPC(lockTarget) and NPCIsEnemy(lockTarget) and (NPCGetPart(lockTarget) ~= nil)
             end
             if stillOk then
                 if lockKind == "player" then lockPart = GetPlayerPart(lockTarget)
@@ -867,7 +921,6 @@ local function UpdateLock()
                 lockTarget, lockPart, lockKind = nil, nil, nil
             end
         end
-
         local now = tick()
         if ACONFIG.SmartSwitch then
             if now - AIM_LAST_SWITCH >= ACONFIG.SwitchCooldown then
@@ -906,7 +959,6 @@ local function UpdateLock()
                 end
             end
         end
-
         if lockTarget and lockPart then
             local mp = Camera.CFrame.Position
             local aimPos = lockPart.Position
@@ -925,10 +977,6 @@ local function UpdateLock()
         end
         return
     end
-
-    -----------------------------------------------------------------
-    -- ✨ MODO 2: AIM ASSIST (suave)
-    -----------------------------------------------------------------
     if ASSIST.Enabled then
         assistTarget, assistPart = AssistFindTarget()
         if assistTarget and assistPart then
@@ -940,15 +988,12 @@ local function UpdateLock()
                 aimPos = aimPos + vel * (dist / math.max(ASSIST.PredictionSpeed, 1))
             end
             local des = CFrame.lookAt(mp, aimPos)
-
-            -- Aplica uma fração do movimento pro alvo
             local strength = math.clamp(ASSIST.Strength, 0, 1)
             local factor = math.clamp(strength * (ASSIST.SmoothStrength / 60), 0, 0.9)
             Camera.CFrame = Camera.CFrame:Lerp(des, factor)
         end
         return
     end
-
     lockTarget, lockPart, lockKind = nil, nil, nil
     assistTarget, assistPart = nil, nil
 end
@@ -994,7 +1039,6 @@ local function StartFly()
         local hum = char:FindFirstChildOfClass("Humanoid")
         local root2 = GetRootPart()
         if not hum or not root2 then return end
-
         if not BodyVelocity or not BodyVelocity.Parent then
             RemoveFlyParts()
             BodyVelocity = Instance.new("BodyVelocity")
@@ -1008,9 +1052,7 @@ local function StartFly()
             BodyForce.Force = Vector3.new(0, 0, 0)
             BodyForce.Parent = root2
         end
-
         BodyForce.Force = Vector3.new(0, root2.AssemblyMass * workspace.Gravity, 0)
-
         local mDir = hum.MoveDirection
         local vel = Vector3.new(0, 0, 0)
         if mDir.Magnitude > 0 then
@@ -1177,79 +1219,53 @@ local function SaveOriginalLighting()
     }
     for _, e in ipairs(Lighting:GetChildren()) do
         if e:IsA("Atmosphere") then
-            FullbrightBackup.Effects[e] = { Density = e.Density, Haze = e.Haze, Glare = e.Glare, Color = e.Color, Decay = e.Decay }
+            FullbrightBackup.Effects[e] = { Density=e.Density, Haze=e.Haze, Glare=e.Glare, Color=e.Color, Decay=e.Decay }
         elseif e:IsA("ColorCorrectionEffect") then
-            FullbrightBackup.Effects[e] = { Brightness = e.Brightness, Contrast = e.Contrast, Saturation = e.Saturation, TintColor = e.TintColor }
+            FullbrightBackup.Effects[e] = { Brightness=e.Brightness, Contrast=e.Contrast, Saturation=e.Saturation, TintColor=e.TintColor }
         elseif e:IsA("BloomEffect") then
-            FullbrightBackup.Effects[e] = { Intensity = e.Intensity }
+            FullbrightBackup.Effects[e] = { Intensity=e.Intensity }
         elseif e:IsA("BlurEffect") then
-            FullbrightBackup.Effects[e] = { Size = e.Size }
+            FullbrightBackup.Effects[e] = { Size=e.Size }
         elseif e:IsA("SunRaysEffect") then
-            FullbrightBackup.Effects[e] = { Intensity = e.Intensity }
+            FullbrightBackup.Effects[e] = { Intensity=e.Intensity }
         end
     end
 end
 
 local function FullbrightApply()
     if not FullbrightBackup then SaveOriginalLighting() end
-    Lighting.Ambient = Color3.fromRGB(130, 130, 130)
-    Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 140)
+    Lighting.Ambient = Color3.fromRGB(130,130,130)
+    Lighting.OutdoorAmbient = Color3.fromRGB(140,140,140)
     Lighting.Brightness = 2
     Lighting.ClockTime = 14
-    Lighting.FogEnd = 100000
-    Lighting.FogStart = 100000
+    Lighting.FogEnd = 100000; Lighting.FogStart = 100000
     Lighting.GlobalShadows = true
     Lighting.EnvironmentDiffuseScale = 0.5
     Lighting.EnvironmentSpecularScale = 0.5
     Lighting.ExposureCompensation = 0
     for _, ef in ipairs(Lighting:GetChildren()) do
-        if ef:IsA("Atmosphere") then
-            ef.Density = 0.1; ef.Haze = 0; ef.Glare = 0
-        elseif ef:IsA("ColorCorrectionEffect") then
-            ef.Brightness = 0; ef.Contrast = 0; ef.Saturation = 0
-            ef.TintColor = Color3.fromRGB(255, 255, 255)
-        elseif ef:IsA("BloomEffect") then
-            ef.Intensity = 0
-        elseif ef:IsA("BlurEffect") then
-            ef.Size = 0
-        elseif ef:IsA("SunRaysEffect") then
-            ef.Intensity = 0
-        end
+        if ef:IsA("Atmosphere") then ef.Density=0.1; ef.Haze=0; ef.Glare=0
+        elseif ef:IsA("ColorCorrectionEffect") then ef.Brightness=0; ef.Contrast=0; ef.Saturation=0; ef.TintColor=Color3.fromRGB(255,255,255)
+        elseif ef:IsA("BloomEffect") then ef.Intensity=0
+        elseif ef:IsA("BlurEffect") then ef.Size=0
+        elseif ef:IsA("SunRaysEffect") then ef.Intensity=0 end
     end
 end
 
 local function FullbrightStart()
     FullbrightApply()
-    for _, c in ipairs(FullbrightConns) do
-        if c and c.Disconnect then pcall(function() c:Disconnect() end) end
-    end
+    for _, c in ipairs(FullbrightConns) do if c and c.Disconnect then pcall(function() c:Disconnect() end) end end
     FullbrightConns = {}
     table.insert(FullbrightConns, Lighting:GetPropertyChangedSignal("ClockTime"):Connect(function()
-        if not FullbrightEnabled then return end
-        if Lighting.ClockTime < 10 or Lighting.ClockTime > 17 then Lighting.ClockTime = 14 end
+        if FullbrightEnabled and (Lighting.ClockTime < 10 or Lighting.ClockTime > 17) then Lighting.ClockTime = 14 end
     end))
     table.insert(FullbrightConns, Lighting:GetPropertyChangedSignal("Brightness"):Connect(function()
-        if not FullbrightEnabled then return end
-        if Lighting.Brightness < 1.5 then Lighting.Brightness = 2 end
-    end))
-    table.insert(FullbrightConns, Lighting:GetPropertyChangedSignal("Ambient"):Connect(function()
-        if not FullbrightEnabled then return end
-        if Lighting.Ambient.R < 0.3 or Lighting.Ambient.G < 0.3 or Lighting.Ambient.B < 0.3 then
-            Lighting.Ambient = Color3.fromRGB(130, 130, 130)
-        end
-    end))
-    table.insert(FullbrightConns, Lighting:GetPropertyChangedSignal("OutdoorAmbient"):Connect(function()
-        if not FullbrightEnabled then return end
-        if Lighting.OutdoorAmbient.R < 0.3 then
-            Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 140)
-        end
+        if FullbrightEnabled and Lighting.Brightness < 1.5 then Lighting.Brightness = 2 end
     end))
 end
 
 local function FullbrightStop()
-    for _, c in ipairs(FullbrightConns) do
-        if c and c.Disconnect then pcall(function() c:Disconnect() end) end
-    end
+    for _, c in ipairs(FullbrightConns) do if c and c.Disconnect then pcall(function() c:Disconnect() end) end end
     FullbrightConns = {}
     if FullbrightBackup then
         Lighting.Ambient = FullbrightBackup.Ambient
@@ -1264,166 +1280,298 @@ local function FullbrightStop()
         Lighting.EnvironmentSpecularScale = FullbrightBackup.EnvironmentSpecularScale
         Lighting.ExposureCompensation = FullbrightBackup.ExposureCompensation
         for ef, vals in pairs(FullbrightBackup.Effects) do
-            if ef and ef.Parent then
-                for k, v in pairs(vals) do pcall(function() ef[k] = v end) end
-            end
+            if ef and ef.Parent then for k, v in pairs(vals) do pcall(function() ef[k] = v end) end end
         end
         FullbrightBackup = nil
     end
 end
 
 -- ==========================================================
---  👁️ ESP
+--  👁️ ESP MELHORADO — Esqueleto + Caixa + Nome + Distância
 -- ==========================================================
-local ESPEnabled      = true
-local ESPMustHaveTeam = true
-local ESPColor        = Color3.fromRGB(255, 30, 30)
-local ESP_ACTIVE      = {}
+local ESP_CONFIG = {
+    Enabled = true,
+    Skeleton = true,
+    Box = false,
+    Distance = true,
+    Name = true,
+    TeamCheck = true,
+    Color = Color3.fromRGB(255, 30, 30),
+    MaxDistance = 1500,
+    TextSize = 12,
+    Thickness = 1,
+}
 
-local function ESPIsValid(plr)
+local SKELETON_R15 = {
+    {"Head", "UpperTorso"},
+    {"UpperTorso", "LowerTorso"},
+    {"UpperTorso", "LeftUpperArm"},
+    {"LeftUpperArm", "LeftLowerArm"},
+    {"LeftLowerArm", "LeftHand"},
+    {"UpperTorso", "RightUpperArm"},
+    {"RightUpperArm", "RightLowerArm"},
+    {"RightLowerArm", "RightHand"},
+    {"LowerTorso", "LeftUpperLeg"},
+    {"LeftUpperLeg", "LeftLowerLeg"},
+    {"LeftLowerLeg", "LeftFoot"},
+    {"LowerTorso", "RightUpperLeg"},
+    {"RightUpperLeg", "RightLowerLeg"},
+    {"RightLowerLeg", "RightFoot"},
+}
+local SKELETON_R6 = {
+    {"Head", "Torso"},
+    {"Torso", "Left Arm"},
+    {"Torso", "Right Arm"},
+    {"Torso", "Left Leg"},
+    {"Torso", "Right Leg"},
+}
+
+local ESP_DRAWS = {}
+local ESP_MAX_LINES = 20
+
+local function ESPIsEnemy(plr)
     if plr == player then return false end
     local char = plr.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return false end
+    if not char or not char.Parent then return false end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum or hum.Health <= 0 then return false end
-    if not ESPMustHaveTeam then return true end
+    if not ESP_CONFIG.TeamCheck then return true end
     local m, h = GetTeamKey(player), GetTeamKey(plr)
     if m and h then return m ~= h end
     return false
 end
 
-local function createBeacon(char, color)
-    local root2 = char:FindFirstChild("HumanoidRootPart")
-    if not root2 then return nil end
-    local b = Instance.new("Part")
-    b.Name = "ESP_Beacon"
-    b.Anchored = true
-    b.CanCollide = false
-    b.CanQuery = false
-    b.CanTouch = false
-    b.Material = Enum.Material.Neon
-    b.Color = color
-    b.Transparency = 0
-    b.Size = Vector3.new(1.2, 300, 1.2)
-    b.CFrame = root2.CFrame * CFrame.new(0, 150, 0)
-    b.Parent = workspace
-    Instance.new("CylinderMesh", b)
-
-    local hl = Instance.new("Highlight")
-    hl.FillColor = color
-    hl.OutlineColor = color
-    hl.FillTransparency = 0
-    hl.OutlineTransparency = 0
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.Adornee = b
-    hl.Parent = b
-
-    local li = Instance.new("PointLight")
-    li.Color = color
-    li.Range = 60
-    li.Brightness = 5
-    li.Parent = b
-
-    task.spawn(function()
-        while b and b.Parent do
-            local t1 = TweenService:Create(b, TweenInfo.new(0.6, Enum.EasingStyle.Sine), { Transparency = 0.5 })
-            t1:Play()
-            local ok = pcall(function() t1.Completed:Wait() end)
-            if not ok or not b.Parent then break end
-            local t2 = TweenService:Create(b, TweenInfo.new(0.6, Enum.EasingStyle.Sine), { Transparency = 0 })
-            t2:Play()
-            pcall(function() t2.Completed:Wait() end)
-            if not b.Parent then break end
-        end
-    end)
-
-    return b
+local function W2S(worldPos)
+    local sp, onScreen = Camera:WorldToViewportPoint(worldPos)
+    return Vector2.new(sp.X, sp.Y), onScreen, sp.Z
 end
 
-local function clearESP(plr)
-    local d = ESP_ACTIVE[plr]
+local function ESPCreateDraw(plr, char)
+    ESPRemoveDraw(plr)
+    local draw = {
+        char = char, plr = plr,
+        skeleton = {}, box = {}, name = nil, dist = nil,
+    }
+    for i = 1, ESP_MAX_LINES do
+        local f = make("Frame", {
+            BackgroundColor3 = ESP_CONFIG.Color,
+            BorderSizePixel = 0, Visible = false, ZIndex = 20,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+        }, gui)
+        draw.skeleton[i] = f
+    end
+    for i = 1, 4 do
+        local f = make("Frame", {
+            BackgroundColor3 = ESP_CONFIG.Color,
+            BorderSizePixel = 0, Visible = false, ZIndex = 19,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+        }, gui)
+        draw.box[i] = f
+    end
+    draw.name = make("TextLabel", {
+        BackgroundTransparency = 1, TextColor3 = ESP_CONFIG.Color,
+        TextStrokeTransparency = 0.3, TextStrokeColor3 = Color3.new(0,0,0),
+        Font = Enum.Font.GothamBold, TextSize = ESP_CONFIG.TextSize,
+        TextXAlignment = Enum.TextXAlignment.Center, Visible = false,
+        ZIndex = 21, Size = UDim2.fromOffset(200, 16),
+        AnchorPoint = Vector2.new(0.5, 1),
+    }, gui)
+    draw.dist = make("TextLabel", {
+        BackgroundTransparency = 1, TextColor3 = ESP_CONFIG.Color,
+        TextStrokeTransparency = 0.3, TextStrokeColor3 = Color3.new(0,0,0),
+        Font = Enum.Font.GothamBold, TextSize = ESP_CONFIG.TextSize,
+        TextXAlignment = Enum.TextXAlignment.Center, Visible = false,
+        ZIndex = 21, Size = UDim2.fromOffset(200, 16),
+        AnchorPoint = Vector2.new(0.5, 0),
+    }, gui)
+    ESP_DRAWS[plr] = draw
+end
+
+function ESPRemoveDraw(plr)
+    local d = ESP_DRAWS[plr]
     if d then
-        if d.conn then pcall(function() d.conn:Disconnect() end) end
-        if d.hl and d.hl.Parent then pcall(function() d.hl:Destroy() end) end
-        if d.b and d.b.Parent then pcall(function() d.b:Destroy() end) end
-        ESP_ACTIVE[plr] = nil
+        for _, f in ipairs(d.skeleton) do pcall(function() f:Destroy() end) end
+        for _, f in ipairs(d.box) do pcall(function() f:Destroy() end) end
+        if d.name then pcall(function() d.name:Destroy() end) end
+        if d.dist then pcall(function() d.dist:Destroy() end) end
+        ESP_DRAWS[plr] = nil
     end
 end
 
-local function applyESP(plr, char)
-    if not char or not char.Parent then return end
-    local root2 = char:FindFirstChild("HumanoidRootPart")
-    if not root2 then return end
-
-    clearESP(plr)
-
-    local hl = Instance.new("Highlight")
-    hl.Name = "ESP_Highlight"
-    hl.FillColor = ESPColor
-    hl.OutlineColor = ESPColor
-    hl.FillTransparency = 0.15
-    hl.OutlineTransparency = 0
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.Adornee = char
-    hl.Parent = char
-
-    local b = createBeacon(char, ESPColor)
-
-    local conn = RunService.RenderStepped:Connect(function()
-        if not b or not b.Parent then return end
-        if not root2 or not root2.Parent then return end
-        b.CFrame = root2.CFrame * CFrame.new(0, 150, 0)
-    end)
-
-    ESP_ACTIVE[plr] = { hl = hl, b = b, conn = conn, char = char }
+local function ESPHideAll(draw)
+    for _, f in ipairs(draw.skeleton) do f.Visible = false end
+    for _, f in ipairs(draw.box) do f.Visible = false end
+    if draw.name then draw.name.Visible = false end
+    if draw.dist then draw.dist.Visible = false end
 end
 
-local function ESPClearAll()
-    local keys = {}
-    for k in pairs(ESP_ACTIVE) do table.insert(keys, k) end
-    for _, k in ipairs(keys) do clearESP(k) end
+local function DrawLine2D(frame, p1, p2, color, thickness)
+    local diff = p2 - p1
+    local length = diff.Magnitude
+    if length < 1 or length > 4000 then
+        frame.Visible = false
+        return
+    end
+    local center = (p1 + p2) * 0.5
+    local angle = math.deg(math.atan2(diff.Y, diff.X))
+    frame.Visible = true
+    frame.Position = UDim2.fromOffset(center.X, center.Y)
+    frame.Size = UDim2.fromOffset(length, thickness or 1)
+    frame.Rotation = angle
+    frame.BackgroundColor3 = color
 end
 
-local function ESPRefreshPlayers()
-    if not ESPEnabled then return end
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= player then
-            local char = plr.Character
-            local root2 = char and char:FindFirstChild("HumanoidRootPart")
-            local hum  = char and char:FindFirstChildOfClass("Humanoid")
-            local valid = ESPIsValid(plr)
-            local data = ESP_ACTIVE[plr]
+local function ESPUpdateDraw(draw)
+    local plr = draw.plr
+    local char = plr.Character
+    if not char or char ~= draw.char or not ESPIsEnemy(plr) then
+        ESPHideAll(draw)
+        return
+    end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        ESPHideAll(draw)
+        return
+    end
+    local camPos = Camera.CFrame.Position
+    local dist = (hrp.Position - camPos).Magnitude
+    if dist > ESP_CONFIG.MaxDistance then
+        ESPHideAll(draw)
+        return
+    end
+    local camLook = Camera.CFrame.LookVector
+    local toChar = hrp.Position - camPos
+    if toChar.Magnitude > 0.01 and toChar.Unit:Dot(camLook) < -0.1 then
+        ESPHideAll(draw)
+        return
+    end
 
-            if valid and root2 and hum and hum.Health > 0 then
-                if not data
-                    or data.char ~= char
-                    or not data.hl or not data.hl.Parent
-                    or not data.b or not data.b.Parent then
-                    clearESP(plr)
-                    applyESP(plr, char)
+    local color = ESP_CONFIG.Color
+    local thickness = ESP_CONFIG.Thickness
+
+    -- Skeleton
+    if ESP_CONFIG.Skeleton then
+        local bones = char:FindFirstChild("UpperTorso") and SKELETON_R15 or SKELETON_R6
+        local lineIdx = 0
+        for _, pair in ipairs(bones) do
+            local p1 = char:FindFirstChild(pair[1])
+            local p2 = char:FindFirstChild(pair[2])
+            if p1 and p2 and p1:IsA("BasePart") and p2:IsA("BasePart") then
+                local sp1, on1 = W2S(p1.Position)
+                local sp2, on2 = W2S(p2.Position)
+                if on1 and on2 then
+                    lineIdx = lineIdx + 1
+                    if draw.skeleton[lineIdx] then
+                        DrawLine2D(draw.skeleton[lineIdx], sp1, sp2, color, thickness)
+                    end
                 end
-            else
-                if data then clearESP(plr) end
             end
         end
+        for i = lineIdx + 1, #draw.skeleton do
+            draw.skeleton[i].Visible = false
+        end
+    else
+        for _, f in ipairs(draw.skeleton) do f.Visible = false end
+    end
+
+    -- Box
+    if ESP_CONFIG.Box then
+        local ok, cf, size = pcall(function() return char:GetBoundingBox() end)
+        if ok and cf then
+            local corners = {}
+            for x = -1, 1, 2 do
+                for y = -1, 1, 2 do
+                    for z = -1, 1, 2 do
+                        table.insert(corners, cf:PointToWorldSpace(Vector3.new(
+                            size.X * x / 2, size.Y * y / 2, size.Z * z / 2
+                        )))
+                    end
+                end
+            end
+            local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
+            local anyOnScreen = false
+            for _, wp in ipairs(corners) do
+                local sp, on = W2S(wp)
+                if on then
+                    anyOnScreen = true
+                    minX = math.min(minX, sp.X); minY = math.min(minY, sp.Y)
+                    maxX = math.max(maxX, sp.X); maxY = math.max(maxY, sp.Y)
+                end
+            end
+            if anyOnScreen then
+                local tl = Vector2.new(minX, minY)
+                local tr = Vector2.new(maxX, minY)
+                local br = Vector2.new(maxX, maxY)
+                local bl = Vector2.new(minX, maxY)
+                DrawLine2D(draw.box[1], tl, tr, color, 2)
+                DrawLine2D(draw.box[2], tr, br, color, 2)
+                DrawLine2D(draw.box[3], br, bl, color, 2)
+                DrawLine2D(draw.box[4], bl, tl, color, 2)
+            else
+                for _, f in ipairs(draw.box) do f.Visible = false end
+            end
+        else
+            for _, f in ipairs(draw.box) do f.Visible = false end
+        end
+    else
+        for _, f in ipairs(draw.box) do f.Visible = false end
+    end
+
+    -- Name
+    if ESP_CONFIG.Name then
+        local head = char:FindFirstChild("Head") or hrp
+        local sp, on = W2S(head.Position + Vector3.new(0, 1.2, 0))
+        if on then
+            draw.name.Visible = true
+            draw.name.Text = plr.Name
+            draw.name.TextColor3 = color
+            draw.name.Position = UDim2.fromOffset(sp.X, sp.Y)
+        else
+            draw.name.Visible = false
+        end
+    else
+        draw.name.Visible = false
+    end
+
+    -- Distance
+    if ESP_CONFIG.Distance then
+        local head = char:FindFirstChild("Head") or hrp
+        local sp, on = W2S(head.Position + Vector3.new(0, -0.8, 0))
+        if on then
+            draw.dist.Visible = true
+            draw.dist.Text = "[" .. math.floor(dist) .. "m]"
+            draw.dist.TextColor3 = color
+            draw.dist.Position = UDim2.fromOffset(sp.X, sp.Y)
+        else
+            draw.dist.Visible = false
+        end
+    else
+        draw.dist.Visible = false
     end
 end
 
-local function ESPApplyColor(newColor)
-    ESPColor = newColor
-    for _, data in pairs(ESP_ACTIVE) do
-        if data.hl and data.hl.Parent then
-            data.hl.FillColor = ESPColor
-            data.hl.OutlineColor = ESPColor
-        end
-        if data.b and data.b.Parent then
-            data.b.Color = ESPColor
-            local li = data.b:FindFirstChildOfClass("PointLight")
-            if li then li.Color = ESPColor end
-            local hlb = data.b:FindFirstChildOfClass("Highlight")
-            if hlb then
-                hlb.FillColor = ESPColor
-                hlb.OutlineColor = ESPColor
+RunService.RenderStepped:Connect(function()
+    if not ESP_CONFIG.Enabled then
+        for _, d in pairs(ESP_DRAWS) do ESPHideAll(d) end
+        return
+    end
+    for _, d in pairs(ESP_DRAWS) do ESPUpdateDraw(d) end
+end)
+
+local function ESPRefresh()
+    if not ESP_CONFIG.Enabled then
+        for plr, _ in pairs(ESP_DRAWS) do ESPRemoveDraw(plr) end
+        return
+    end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then
+            if ESPIsEnemy(plr) and plr.Character then
+                local d = ESP_DRAWS[plr]
+                if not d or d.char ~= plr.Character then
+                    ESPCreateDraw(plr, plr.Character)
+                end
+            else
+                if ESP_DRAWS[plr] then ESPRemoveDraw(plr) end
             end
         end
     end
@@ -1431,39 +1579,36 @@ end
 
 task.spawn(function()
     while true do
-        if ESPEnabled then ESPRefreshPlayers() end
-        task.wait(0.15)
+        ESPRefresh()
+        task.wait(0.3)
     end
 end)
 
-local function hookPlayer(plr)
-    if plr == player then return end
-    if plr.Character then
-        task.defer(function()
-            if ESPEnabled then ESPRefreshPlayers() end
-        end)
+local function ESPApplyColor(newColor)
+    ESP_CONFIG.Color = newColor
+    for _, d in pairs(ESP_DRAWS) do
+        for _, f in ipairs(d.skeleton) do f.BackgroundColor3 = newColor end
+        for _, f in ipairs(d.box) do f.BackgroundColor3 = newColor end
+        if d.name then d.name.TextColor3 = newColor end
+        if d.dist then d.dist.TextColor3 = newColor end
     end
-    plr.CharacterAdded:Connect(function()
-        task.wait(0.1)
-        if ESPEnabled then ESPRefreshPlayers() end
-        task.delay(1, function()
-            if ESPEnabled then ESPRefreshPlayers() end
-        end)
-    end)
-    plr.CharacterRemoving:Connect(function()
-        clearESP(plr)
-    end)
 end
 
-for _, p in ipairs(Players:GetPlayers()) do hookPlayer(p) end
-Players.PlayerAdded:Connect(hookPlayer)
-Players.PlayerRemoving:Connect(function(p) clearESP(p) end)
+local function ESPClearAll()
+    for plr, _ in pairs(ESP_DRAWS) do ESPRemoveDraw(plr) end
+end
+
+local function ESPUpdateTeamCheck()
+    for _, d in pairs(ESP_DRAWS) do
+        if not ESPIsEnemy(d.plr) then ESPRemoveDraw(d.plr) end
+    end
+    ESPRefresh()
+end
 
 -- ==========================================================
---  📍 SISTEMA DE TP
+--  📍 TP
 -- ==========================================================
 local TPPoints = {}
-
 local function TeleportTo(pos)
     local c = player.Character
     local r = c and c:FindFirstChild("HumanoidRootPart")
@@ -1476,58 +1621,43 @@ local function TeleportTo(pos)
 end
 
 -- ==========================================================
---  🖱️ AUTO CLICKER — BOLINHA DE TOQUE
+--  🖱️ AUTO CLICKER — BOLINHA
 -- ==========================================================
-local AutoClick = {
-    Enabled = false, CPS = 30, Thread = nil, Touching = false, BubbleVisible = false,
-}
+local AutoClick = { Enabled=false, CPS=30, Thread=nil, Touching=false, BubbleVisible=false }
 local AC_BUBBLE = 80
 
 local acBubble = make("Frame", {
-    Name = "AutoClickBubble",
-    Size = UDim2.fromOffset(AC_BUBBLE, AC_BUBBLE),
-    Position = UDim2.fromOffset(200, 300),
-    BackgroundColor3 = Color3.fromRGB(239, 68, 68),
-    Visible = false,
-    ZIndex = 60,
+    Name = "AutoClickBubble", Size = UDim2.fromOffset(AC_BUBBLE, AC_BUBBLE),
+    Position = UDim2.fromOffset(200, 300), BackgroundColor3 = Color3.fromRGB(239, 68, 68),
+    Visible = false, ZIndex = 300,
 }, gui)
 round(acBubble, AC_BUBBLE / 2)
-make("UIGradient", {
-    Color = ColorSequence.new(Color3.fromRGB(239, 68, 68), Color3.fromRGB(250, 204, 21)),
-    Rotation = 45,
-}, acBubble)
+make("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(239,68,68), Color3.fromRGB(250,204,21)), Rotation = 45 }, acBubble)
 stroke(acBubble, THEME.White, 3, 0.2)
 local acScale = make("UIScale", { Scale = 0 }, acBubble)
 make("TextLabel", {
     BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1),
     Text = "👆", TextColor3 = THEME.White, TextSize = 38,
-    Font = Enum.Font.GothamBold, ZIndex = 61,
+    Font = Enum.Font.GothamBold, ZIndex = 301,
 }, acBubble)
-
 local acRing = make("Frame", {
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.fromScale(0.5, 0.5),
-    Size = UDim2.fromScale(1, 1),
-    BackgroundTransparency = 1,
-    ZIndex = 59,
+    AnchorPoint = Vector2.new(0.5,0.5), Position = UDim2.fromScale(0.5,0.5),
+    Size = UDim2.fromScale(1,1), BackgroundTransparency = 1, ZIndex = 299,
 }, acBubble)
 round(acRing, AC_BUBBLE / 2)
-local acRingStroke = stroke(acRing, Color3.fromRGB(239, 68, 68), 2, 0.3)
+local acRingStroke = stroke(acRing, Color3.fromRGB(239,68,68), 2, 0.3)
 local acRingScale = make("UIScale", { Scale = 1 }, acRing)
 local acRingInfo = TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, -1, false)
 TweenService:Create(acRingScale, acRingInfo, { Scale = 1.6 }):Play()
 TweenService:Create(acRingStroke, acRingInfo, { Transparency = 1 }):Play()
-
-local acHit = make("TextButton", {
-    Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", ZIndex = 62,
-}, acBubble)
+local acHit = make("TextButton", { Size = UDim2.fromScale(1,1), BackgroundTransparency = 1, Text = "", ZIndex = 302 }, acBubble)
 
 local function ACStartClickLoop()
     if AutoClick.Thread then return end
     AutoClick.Thread = task.spawn(function()
         while AutoClick.Touching and AutoClick.Enabled do
-            pcall(function() VirtualUser:Button1Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame) end)
-            pcall(function() VirtualUser:Button1Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame) end)
+            pcall(function() VirtualUser:Button1Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame) end)
+            pcall(function() VirtualUser:Button1Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame) end)
             task.wait(1 / math.max(AutoClick.CPS, 1))
         end
         AutoClick.Thread = nil
@@ -1538,21 +1668,17 @@ local function ACStopClickLoop() AutoClick.Touching = false end
 local function ACShowBubble(show)
     AutoClick.BubbleVisible = show
     if show then
-        acBubble.Visible = true
-        acScale.Scale = 0
+        acBubble.Visible = true; acScale.Scale = 0
         tween(acScale, { Scale = 1 }, 0.35, Enum.EasingStyle.Back)
     else
         tween(acScale, { Scale = 0 }, 0.2)
-        task.delay(0.22, function()
-            if not AutoClick.BubbleVisible then acBubble.Visible = false end
-        end)
+        task.delay(0.22, function() if not AutoClick.BubbleVisible then acBubble.Visible = false end end)
         ACStopClickLoop()
     end
 end
 
 do
-    local dragging, dragStart, startPos
-    local moved = false
+    local dragging, dragStart, startPos, moved = false, nil, nil, false
     acHit.InputBegan:Connect(function(input)
         if isPointer(input) then
             dragging = true; moved = false
@@ -1574,9 +1700,10 @@ do
             end
             if moved then
                 local vp = gui.AbsoluteSize
-                local nx = math.clamp(startPos.X.Offset + d.X, 8, vp.X - AC_BUBBLE - 8)
-                local ny = math.clamp(startPos.Y.Offset + d.Y, 30, vp.Y - AC_BUBBLE - 8)
-                acBubble.Position = UDim2.fromOffset(nx, ny)
+                acBubble.Position = UDim2.fromOffset(
+                    math.clamp(startPos.X.Offset + d.X, 8, vp.X - AC_BUBBLE - 8),
+                    math.clamp(startPos.Y.Offset + d.Y, 30, vp.Y - AC_BUBBLE - 8)
+                )
             end
         end
     end)
@@ -1589,8 +1716,7 @@ do
     end)
 end
 connect(UserInputService.InputEnded, function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-       or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         ACStopClickLoop()
     end
 end)
@@ -1610,13 +1736,10 @@ end)
 addToggle(aimTab, "🛡️ Team Check", true, function(v) ACONFIG.TeamCheck = v end)
 addToggle(aimTab, "🎯 Predição", false, function(v) ACONFIG.Prediction = v end)
 addToggle(aimTab, "🔥 Auto Fire", false, function(v) ACONFIG.AutoFire = v end)
-
 addSlider(aimTab, "FOV (graus)", 5, 360, 360, function(v) ACONFIG.FOV = v end)
 addSlider(aimTab, "Distância máx", 20, 8000, 5000, function(v) ACONFIG.MaxDistance = v end)
 addSlider(aimTab, "Velocidade da bala", 50, 3000, 400, function(v) ACONFIG.PredictionSpeed = v end)
 addSlider(aimTab, "Suavidade (0 = colado)", 0, 1, 0, function(v) ACONFIG.Smoothness = v end, 2)
-
-text(aimTab, "💡 Esse é o aim 100% que você gostou. Se quiser algo mais suave, use o Aim Assist.", 12, Color3.fromRGB(250, 204, 21))
 
 -- ==========================================================
 --  ✨ ABA AIM ASSIST
@@ -1624,29 +1747,16 @@ text(aimTab, "💡 Esse é o aim 100% que você gostou. Se quiser algo mais suav
 local assistTab = newTab("Assist", "✨", 2)
 text(assistTab, "Aim Assist (suave)", 20, THEME.Text, Enum.Font.GothamBold)
 text(assistTab, "Puxa a mira suavemente pro inimigo.", 12, THEME.SubText)
-
 addToggle(assistTab, "✨ Ativar Aim Assist", false, function(v)
     ASSIST.Enabled = v
-    if v then
-        notify("✨ Aim Assist ON — força " .. math.floor(ASSIST.Strength * 100) .. "%")
-    else
-        notify("✨ Aim Assist OFF")
-    end
+    notify(v and "✨ Assist ON" or "Assist OFF")
 end)
 addToggle(assistTab, "🛡️ Team Check", true, function(v) ASSIST.TeamCheck = v end)
 addToggle(assistTab, "🎯 Predição", false, function(v) ASSIST.Prediction = v end)
-
-addSlider(assistTab, "Força do Assist (%)", 5, 100, 35, function(v)
-    ASSIST.Strength = v / 100
-end)
-
-addSlider(assistTab, "FOV do Assist", 5, 360, 90, function(v) ASSIST.FOV = v end)
+addSlider(assistTab, "Força (%)", 5, 100, 35, function(v) ASSIST.Strength = v/100 end)
+addSlider(assistTab, "FOV", 5, 360, 90, function(v) ASSIST.FOV = v end)
 addSlider(assistTab, "Distância máx", 50, 5000, 800, function(v) ASSIST.MaxDistance = v end)
-addSlider(assistTab, "Velocidade da bala (predição)", 50, 3000, 400, function(v) ASSIST.PredictionSpeed = v end)
 addSlider(assistTab, "Reajuste (suavidade)", 1, 30, 6, function(v) ASSIST.SmoothStrength = v end)
-
-text(assistTab, "💡 IMPORTANTE:", 12, THEME.SubText, Enum.Font.GothamBold)
-text(assistTab, "• Assist só funciona se o Aim 100% estiver DESLIGADO.\n• Força baixa (10-30%) = você controla mais.\n• Força alta (60-100%) = quase colado.\n• Reajuste baixo = mais macio.\n• Reajuste alto = responde rápido.", 12, Color3.fromRGB(250, 204, 21))
 
 -- ==========================================================
 --  👹 ABA AIM NPC
@@ -1654,25 +1764,34 @@ text(assistTab, "• Assist só funciona se o Aim 100% estiver DESLIGADO.\n• F
 local npcTab = newTab("Aim NPC", "👹", 3)
 text(npcTab, "Aimbot NPCs", 20, THEME.Text, Enum.Font.GothamBold)
 text(npcTab, "Cola em NPCs / zumbis / bonecos.", 12, THEME.SubText)
-
 addToggle(npcTab, "👹 Ativar Aim 100% em NPCs", false, function(v)
     ACONFIG.EnabledNPCs = v
     MaybeClearLock()
     notify(v and "👹 Aim NPCs ON" or "Aim NPCs OFF")
+end)
+addToggle(npcTab, "🛡️ Team Check (ignora aliados)", false, function(v)
+    ACONFIG.NPCTeamCheck = v
+    NPC_CACHE_TIME = 0
+    notify(v and "🛡️ Team Check NPCs ON" or "Team Check OFF")
 end)
 addToggle(npcTab, "🧟 Só zumbis / bonecos", false, function(v)
     ACONFIG.OnlyZombies = v
     NPC_CACHE_TIME = 0
     notify(v and "🧟 Só zumbis ON" or "Todos os NPCs")
 end)
-
-addButton(npcTab, "🔍 Contar NPCs no mapa", true, function()
+addButton(npcTab, "🔍 Contar NPCs", true, function()
     NPC_CACHE_TIME = 0
     local npcs = GetAllNPCs()
-    notify("👹 " .. #npcs .. " NPCs encontrados")
+    local inimigos = 0
+    for _, npc in ipairs(npcs) do
+        if NPCIsEnemy(npc) then inimigos = inimigos + 1 end
+    end
+    if ACONFIG.NPCTeamCheck then
+        notify("👹 " .. #npcs .. " NPCs | " .. inimigos .. " inimigos")
+    else
+        notify("👹 " .. #npcs .. " NPCs")
+    end
 end)
-
-text(npcTab, "💡 Se ligar junto com Aim Players, escolhe o mais próximo.", 12, Color3.fromRGB(250, 204, 21))
 
 -- ==========================================================
 --  ⚡ ABA SPEED
@@ -1680,99 +1799,102 @@ text(npcTab, "💡 Se ligar junto com Aim Players, escolhe o mais próximo.", 12
 local spdTab = newTab("Speed", "⚡", 4)
 text(spdTab, "Speed / Pulo / FOV", 20, THEME.Text, Enum.Font.GothamBold)
 text(spdTab, "Ajustes persistentes.", 12, THEME.SubText)
-
-addToggle(spdTab, "⚡ Ativar Speed personalizado", false, function(v)
+addToggle(spdTab, "⚡ Ativar Speed", false, function(v)
     ConfigState.SpeedEnabled = v
     local hum = GetHumanoid()
     if hum then
-        if v then
-            hum.WalkSpeed = ConfigState.SpeedValue
-            AttachSpeedTrap()
-        else
-            hum.WalkSpeed = 16
-            if SpeedPropConn then SpeedPropConn:Disconnect() SpeedPropConn = nil end
-        end
+        if v then hum.WalkSpeed = ConfigState.SpeedValue; AttachSpeedTrap()
+        else hum.WalkSpeed = 16; if SpeedPropConn then SpeedPropConn:Disconnect() SpeedPropConn = nil end end
     end
     notify(v and "⚡ Speed ON" or "Speed OFF")
 end)
 addSlider(spdTab, "Velocidade (WalkSpeed)", 16, 1000, 16, function(v)
     ConfigState.SpeedValue = v
-    if ConfigState.SpeedEnabled then
-        local hum = GetHumanoid()
-        if hum then hum.WalkSpeed = v end
-    end
+    if ConfigState.SpeedEnabled then local hum = GetHumanoid(); if hum then hum.WalkSpeed = v end end
 end)
-
-addToggle(spdTab, "🦘 Ativar Pulo Alto", false, function(v)
+addToggle(spdTab, "🦘 Pulo Alto", false, function(v)
     ConfigState.JumpEnabled = v
     local hum = GetHumanoid()
     if hum then
-        if v then
-            hum.UseJumpPower = true
-            hum.JumpPower = ConfigState.JumpValue
-        else
-            hum.UseJumpPower = true
-            hum.JumpPower = 50
-        end
+        if v then hum.UseJumpPower = true; hum.JumpPower = ConfigState.JumpValue
+        else hum.UseJumpPower = true; hum.JumpPower = 50 end
     end
     notify(v and "🦘 Pulo Alto ON" or "Pulo normal")
 end)
 addSlider(spdTab, "Força do Pulo", 50, 500, 50, function(v)
     ConfigState.JumpValue = v
-    if ConfigState.JumpEnabled then
-        local hum = GetHumanoid()
-        if hum then
-            hum.UseJumpPower = true
-            hum.JumpPower = v
-        end
-    end
+    if ConfigState.JumpEnabled then local hum = GetHumanoid(); if hum then hum.UseJumpPower = true; hum.JumpPower = v end end
 end)
-
-addToggle(spdTab, "📷 FOV personalizado", false, function(v)
+addToggle(spdTab, "📷 FOV", false, function(v)
     ConfigState.FOVEnabled = v
-    if Camera then
-        if v then Camera.FieldOfView = ConfigState.FOVValue
-        else Camera.FieldOfView = 70 end
-    end
-    notify(v and "📷 FOV ON" or "FOV padrão")
+    if Camera then if v then Camera.FieldOfView = ConfigState.FOVValue else Camera.FieldOfView = 70 end end
 end)
 addSlider(spdTab, "FOV da câmera", 40, 120, 70, function(v)
     ConfigState.FOVValue = v
-    if ConfigState.FOVEnabled and Camera then
-        Camera.FieldOfView = v
+    if ConfigState.FOVEnabled and Camera then Camera.FieldOfView = v end
+end)
+
+-- ==========================================================
+--  👁️ ABA ESP MELHORADO
+-- ==========================================================
+local espTab = newTab("ESP", "👁️", 5)
+text(espTab, "ESP Melhorado", 20, THEME.Text, Enum.Font.GothamBold)
+text(espTab, "Ative só o que quiser ver.", 12, THEME.SubText)
+
+addToggle(espTab, "👁️ Ativar ESP", true, function(v)
+    ESP_CONFIG.Enabled = v
+    if v then ESPRefresh() else ESPClearAll() end
+    notify(v and "👁️ ESP ON" or "ESP OFF")
+end)
+
+text(espTab, "🎯 O QUE MOSTRAR", 12, THEME.SubText, Enum.Font.GothamBold)
+
+addToggle(espTab, "🦴 Esqueleto (ossos)", true, function(v)
+    ESP_CONFIG.Skeleton = v
+    notify(v and "🦴 Esqueleto ON" or "Esqueleto OFF")
+end)
+addToggle(espTab, "📦 Caixa (box)", false, function(v)
+    ESP_CONFIG.Box = v
+    notify(v and "📦 Caixa ON" or "Caixa OFF")
+end)
+addToggle(espTab, "📛 Nome", true, function(v)
+    ESP_CONFIG.Name = v
+    notify(v and "📛 Nome ON" or "Nome OFF")
+end)
+addToggle(espTab, "📏 Distância", true, function(v)
+    ESP_CONFIG.Distance = v
+    notify(v and "📏 Distância ON" or "Distância OFF")
+end)
+
+addToggle(espTab, "🛡️ Só time inimigo", true, function(v)
+    ESP_CONFIG.TeamCheck = v
+    ESPUpdateTeamCheck()
+    notify(v and "🛡️ Team Check ON" or "Team Check OFF")
+end)
+
+text(espTab, "⚙️ AJUSTES", 12, THEME.SubText, Enum.Font.GothamBold)
+
+addSlider(espTab, "Distância máx (studs)", 50, 5000, 1500, function(v)
+    ESP_CONFIG.MaxDistance = v
+end)
+
+addSlider(espTab, "Tamanho do texto", 8, 24, 12, function(v)
+    ESP_CONFIG.TextSize = v
+    for _, d in pairs(ESP_DRAWS) do
+        if d.name then d.name.TextSize = v end
+        if d.dist then d.dist.TextSize = v end
     end
 end)
 
--- ==========================================================
---  👁️ ABA ESP
--- ==========================================================
-local espTab = newTab("ESP", "👁️", 5)
-text(espTab, "ESP — Antena Neon", 20, THEME.Text, Enum.Font.GothamBold)
-text(espTab, "Coluna neon nos inimigos.", 12, THEME.SubText)
-
-addToggle(espTab, "👁️ Ativar ESP", true, function(v)
-    ESPEnabled = v
-    if v then ESPRefreshPlayers() else ESPClearAll() end
-    notify(v and "👁️ ESP ON" or "ESP OFF")
-end)
-addToggle(espTab, "🛡️ Só time inimigo", true, function(v)
-    ESPMustHaveTeam = v
-    ESPClearAll()
-    ESPRefreshPlayers()
+addSlider(espTab, "Espessura das linhas", 1, 5, 1, function(v)
+    ESP_CONFIG.Thickness = v
 end)
 
 text(espTab, "🎨 COR DO ESP", 12, THEME.SubText, Enum.Font.GothamBold)
 
 local colorCard = card(espTab, 130)
-make("UIPadding", {
-    PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 10),
-    PaddingRight = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10),
-}, colorCard)
-make("UIGridLayout", {
-    CellSize = UDim2.new(1 / 4, -6, 0, 44),
-    CellPadding = UDim2.fromOffset(8, 8),
-    SortOrder = Enum.SortOrder.LayoutOrder,
-}, colorCard)
+make("UIPadding", { PaddingTop=UDim.new(0,10), PaddingLeft=UDim.new(0,10), PaddingRight=UDim.new(0,10), PaddingBottom=UDim.new(0,10) }, colorCard)
+make("UIGridLayout", { CellSize=UDim2.new(1/4,-6,0,44), CellPadding=UDim2.fromOffset(8,8), SortOrder=Enum.SortOrder.LayoutOrder }, colorCard)
 
 local colorStrokes = {}
 for i, preset in ipairs(ESP_COLORS) do
@@ -1783,9 +1905,9 @@ for i, preset in ipairs(ESP_COLORS) do
     colorStrokes[i] = sst
 
     local btn = make("TextButton", {
-        Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
-        Text = name, TextColor3 = Color3.new(1, 1, 1),
-        TextStrokeTransparency = 0.3, TextStrokeColor3 = Color3.new(0, 0, 0),
+        Size = UDim2.fromScale(1,1), BackgroundTransparency = 1,
+        Text = name, TextColor3 = Color3.new(1,1,1),
+        TextStrokeTransparency = 0.3, TextStrokeColor3 = Color3.new(0,0,0),
         TextSize = 11, Font = Enum.Font.GothamBold, AutoButtonColor = false,
     }, sw)
     btn.Activated:Connect(function()
@@ -1804,17 +1926,10 @@ colorStrokes[1].Transparency = 0
 local noclipTab = newTab("Noclip", "🧱", 6)
 text(noclipTab, "Noclip", 20, THEME.Text, Enum.Font.GothamBold)
 text(noclipTab, "Atravessa paredes.", 12, THEME.SubText)
-
 addToggle(noclipTab, "🧱 Ativar Noclip", false, function(v)
     NoclipEnabled = v
-    if v then
-        NoclipStart()
-        NoclipApplyToChar(player.Character)
-        notify("🧱 Noclip ON")
-    else
-        NoclipStop()
-        notify("🧱 Noclip OFF")
-    end
+    if v then NoclipStart(); NoclipApplyToChar(player.Character); notify("Noclip ON")
+    else NoclipStop(); notify("Noclip OFF") end
 end)
 
 -- ==========================================================
@@ -1823,15 +1938,8 @@ end)
 local vooTab = newTab("Voo", "🚀", 7)
 text(vooTab, "Voo", 20, THEME.Text, Enum.Font.GothamBold)
 text(vooTab, "Voe livre.", 12, THEME.SubText)
-
 addToggle(vooTab, "🚀 Ativar Voo", false, function(v)
-    if v then
-        StartFly()
-        notify("🚀 Voo ON")
-    else
-        StopFly()
-        notify("🚀 Voo OFF")
-    end
+    if v then StartFly(); notify("Voo ON") else StopFly(); notify("Voo OFF") end
 end)
 addSlider(vooTab, "Velocidade do Voo", 20, 800, 60, function(v) FlySpeed = v end)
 
@@ -1841,16 +1949,10 @@ addSlider(vooTab, "Velocidade do Voo", 20, 800, 60, function(v) FlySpeed = v end
 local fullTab = newTab("Fullbright", "🔦", 8)
 text(fullTab, "Fullbright", 20, THEME.Text, Enum.Font.GothamBold)
 text(fullTab, "Clareia o mapa.", 12, THEME.SubText)
-
 addToggle(fullTab, "🔦 Ativar Fullbright", false, function(v)
     FullbrightEnabled = v
-    if v then
-        FullbrightStart()
-        notify("🔦 Fullbright ON")
-    else
-        FullbrightStop()
-        notify("🔦 Fullbright OFF")
-    end
+    if v then FullbrightStart(); notify("Fullbright ON")
+    else FullbrightStop(); notify("Fullbright OFF") end
 end)
 
 -- ==========================================================
@@ -1859,7 +1961,6 @@ end)
 local tpTab = newTab("TP", "📍", 9)
 text(tpTab, "Teleportes", 20, THEME.Text, Enum.Font.GothamBold)
 text(tpTab, "Salve pontos e volte pra eles.", 12, THEME.SubText)
-
 addButton(tpTab, "📍 Salvar Posição Atual", true, function()
     local c = player.Character
     local r = c and c:FindFirstChild("HumanoidRootPart")
@@ -1867,97 +1968,54 @@ addButton(tpTab, "📍 Salvar Posição Atual", true, function()
     local idx = #TPPoints + 1
     table.insert(TPPoints, {
         name = "Ponto " .. idx .. " (" .. math.floor(r.Position.X) .. ", " .. math.floor(r.Position.Z) .. ")",
-        pos  = r.Position,
+        pos = r.Position,
     })
     if _G.RefreshTPList then _G.RefreshTPList() end
-    notify("📍 Ponto " .. idx .. " salvo!")
+    notify("Ponto " .. idx .. " salvo!")
 end)
-
 local savedHeader = make("TextLabel", {
-    Size = UDim2.new(1, 0, 0, 26),
-    BackgroundColor3 = THEME.Off,
-    BackgroundTransparency = 0.4,
-    Text = "📍 Pontos salvos: 0",
-    TextColor3 = THEME.SubText,
-    Font = Enum.Font.GothamBold,
-    TextSize = 12,
-    LayoutOrder = order(),
+    Size = UDim2.new(1,0,0,26), BackgroundColor3 = THEME.Off, BackgroundTransparency = 0.4,
+    Text = "📍 Pontos salvos: 0", TextColor3 = THEME.SubText,
+    Font = Enum.Font.GothamBold, TextSize = 12, LayoutOrder = order(),
 }, tpTab)
 round(savedHeader, 8)
-
 local savedHolder = makeListHolder(tpTab)
-
 _G.RefreshTPList = function()
     for _, ch in ipairs(savedHolder:GetChildren()) do
         if not ch:IsA("UIListLayout") then ch:Destroy() end
     end
     savedHeader.Text = "📍 Pontos salvos: " .. #TPPoints
-
     if #TPPoints == 0 then
         local empty = make("TextLabel", {
-            Size = UDim2.new(1, 0, 0, 30),
-            BackgroundColor3 = THEME.Off,
-            BackgroundTransparency = 0.6,
-            Text = "Nenhum ponto salvo ainda",
-            TextColor3 = THEME.SubText,
-            Font = Enum.Font.Gotham,
-            TextSize = 12,
+            Size = UDim2.new(1,0,0,30), BackgroundColor3 = THEME.Off, BackgroundTransparency = 0.6,
+            Text = "Nenhum ponto salvo ainda", TextColor3 = THEME.SubText,
+            Font = Enum.Font.Gotham, TextSize = 12,
         }, savedHolder)
         round(empty, 8)
     else
         for i, p in ipairs(TPPoints) do
-            local row = make("Frame", {
-                Size = UDim2.new(1, 0, 0, 38),
-                BackgroundColor3 = THEME.Card,
-                LayoutOrder = i,
-            }, savedHolder)
-            round(row, 10)
-            stroke(row, THEME.White, 1, 0.85)
-
+            local row = make("Frame", { Size = UDim2.new(1,0,0,38), BackgroundColor3 = THEME.Card, LayoutOrder = i }, savedHolder)
+            round(row, 10); stroke(row, THEME.White, 1, 0.85)
             local lbl = make("TextLabel", {
-                Size = UDim2.new(1, -110, 1, 0),
-                Position = UDim2.fromOffset(12, 0),
-                BackgroundTransparency = 1,
-                Text = p.name,
-                TextColor3 = THEME.Text,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                Font = Enum.Font.GothamMedium,
-                TextSize = 12,
-                TextTruncate = Enum.TextTruncate.AtEnd,
+                Size = UDim2.new(1,-110,1,0), Position = UDim2.fromOffset(12,0),
+                BackgroundTransparency = 1, Text = p.name, TextColor3 = THEME.Text,
+                TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.GothamMedium, TextSize = 12,
             }, row)
-
             local irBtn = make("TextButton", {
-                Size = UDim2.fromOffset(50, 26),
-                Position = UDim2.new(1, -96, 0.5, -13),
-                BackgroundColor3 = THEME.Accent,
-                Text = "IR",
-                TextColor3 = THEME.White,
-                Font = Enum.Font.GothamBold,
-                TextSize = 12,
-                AutoButtonColor = false,
+                Size = UDim2.fromOffset(50,26), Position = UDim2.new(1,-96,0.5,-13),
+                BackgroundColor3 = THEME.Accent, Text = "IR", TextColor3 = THEME.White,
+                Font = Enum.Font.GothamBold, TextSize = 12, AutoButtonColor = false,
             }, row)
             round(irBtn, 6)
-            themed(function() irBtn.BackgroundColor3 = THEME.Accent end)
-            irBtn.Activated:Connect(function()
-                TeleportTo(p.pos)
-                notify("📍 TP feito!")
-            end)
-
+            irBtn.Activated:Connect(function() TeleportTo(p.pos); notify("TP feito!") end)
             local delBtn = make("TextButton", {
-                Size = UDim2.fromOffset(34, 26),
-                Position = UDim2.new(1, -40, 0.5, -13),
-                BackgroundColor3 = THEME.Danger,
-                Text = "X",
-                TextColor3 = THEME.White,
-                Font = Enum.Font.GothamBold,
-                TextSize = 12,
-                AutoButtonColor = false,
+                Size = UDim2.fromOffset(34,26), Position = UDim2.new(1,-40,0.5,-13),
+                BackgroundColor3 = THEME.Danger, Text = "X", TextColor3 = THEME.White,
+                Font = Enum.Font.GothamBold, TextSize = 12, AutoButtonColor = false,
             }, row)
             round(delBtn, 6)
             delBtn.Activated:Connect(function()
-                table.remove(TPPoints, i)
-                _G.RefreshTPList()
-                notify("Ponto removido")
+                table.remove(TPPoints, i); _G.RefreshTPList(); notify("Ponto removido")
             end)
         end
     end
@@ -1969,37 +2027,17 @@ _G.RefreshTPList()
 -- ==========================================================
 local acTab = newTab("Auto Click", "🖱️", 10)
 text(acTab, "Auto Click com Bolinha", 20, THEME.Text, Enum.Font.GothamBold)
-text(acTab, "Ativa → aparece bolinha pra arrastar e segurar.", 12, THEME.SubText)
-
-addToggle(acTab, "🖱️ Ativar Auto Click (mostra bolinha)", false, function(v)
+text(acTab, "Ativa → bolinha pra arrastar e segurar.", 12, THEME.SubText)
+addToggle(acTab, "🖱️ Ativar Auto Click", false, function(v)
     AutoClick.Enabled = v
-    if v then
-        ACShowBubble(true)
-        notify("👆 Bolinha apareceu!")
-    else
-        ACShowBubble(false)
-        AutoClick.Touching = false
-        if AutoClick.Thread then
-            task.cancel(AutoClick.Thread)
-            AutoClick.Thread = nil
-        end
-        notify("🖱️ Auto Click OFF")
-    end
+    if v then ACShowBubble(true); notify("👆 Bolinha apareceu!")
+    else ACShowBubble(false); AutoClick.Touching = false
+        if AutoClick.Thread then task.cancel(AutoClick.Thread); AutoClick.Thread = nil end
+        notify("🖱️ Auto Click OFF") end
 end)
-
-addSlider(acTab, "Cliques por segundo (CPS)", 1, 500, 30, function(v)
-    AutoClick.CPS = v
-end)
-
-addButton(acTab, "🔥 MODO INSANO (CPS 300)", true, function()
-    AutoClick.CPS = 300
-    notify("🔥 CPS definido pra 300")
-end)
-
-addButton(acTab, "⚡ MODO TURBO (CPS 500)", false, function()
-    AutoClick.CPS = 500
-    notify("⚡ CPS definido pra 500")
-end)
+addSlider(acTab, "CPS", 1, 500, 30, function(v) AutoClick.CPS = v end)
+addButton(acTab, "🔥 MODO INSANO (300 CPS)", true, function() AutoClick.CPS = 300; notify("🔥 CPS 300") end)
+addButton(acTab, "⚡ MODO TURBO (500 CPS)", false, function() AutoClick.CPS = 500; notify("⚡ CPS 500") end)
 
 -- ==========================================================
 --  ⚙️ ABA CONFIG
@@ -2007,20 +2045,10 @@ end)
 local cfgTab = newTab("Config", "⚙️", 11)
 text(cfgTab, "Config", 20, THEME.Text, Enum.Font.GothamBold)
 text(cfgTab, "Personalize o painel.", 12, THEME.SubText)
-
 text(cfgTab, "🎨 COR DA INTERFACE", 12, THEME.SubText, Enum.Font.GothamBold)
-
 local themeCard = card(cfgTab, 132)
-make("UIPadding", {
-    PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 10),
-    PaddingRight = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10),
-}, themeCard)
-make("UIGridLayout", {
-    CellSize = UDim2.new(1 / 3, -6, 0, 50),
-    CellPadding = UDim2.fromOffset(8, 8),
-    SortOrder = Enum.SortOrder.LayoutOrder,
-}, themeCard)
-
+make("UIPadding", { PaddingTop=UDim.new(0,10), PaddingLeft=UDim.new(0,10), PaddingRight=UDim.new(0,10), PaddingBottom=UDim.new(0,10) }, themeCard)
+make("UIGridLayout", { CellSize=UDim2.new(1/3,-6,0,50), CellPadding=UDim2.fromOffset(8,8), SortOrder=Enum.SortOrder.LayoutOrder }, themeCard)
 local themeStrokes = {}
 for i, preset in ipairs(PRESETS) do
     local name, c1, c2 = preset[1], preset[2], preset[3]
@@ -2029,247 +2057,24 @@ for i, preset in ipairs(PRESETS) do
     make("UIGradient", { Color = ColorSequence.new(c1, c2), Rotation = 30 }, sw)
     local sst = stroke(sw, THEME.White, 2.5, i == 1 and 0 or 1)
     themeStrokes[i] = sst
-
     local btn = make("TextButton", {
-        Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
+        Size = UDim2.fromScale(1,1), BackgroundTransparency = 1,
         Text = name, TextColor3 = THEME.White, TextSize = 13,
         Font = Enum.Font.GothamBold, AutoButtonColor = false,
     }, sw)
     btn.Activated:Connect(function()
         applyTheme(c1, c2)
-        for j, s in ipairs(themeStrokes) do
-            tween(s, { Transparency = (j == i) and 0 or 1 })
-        end
-        notify("Tema " .. name .. " aplicado")
+        for j, s in ipairs(themeStrokes) do tween(s, { Transparency = (j == i) and 0 or 1 }) end
+        notify("Tema " .. name)
     end)
 end
-
-text(cfgTab, "📏 TAMANHO DO PAINEL", 12, THEME.SubText, Enum.Font.GothamBold)
-
-addSlider(cfgTab, "Escala do painel (%)", 60, 130, 100, function(v)
-    PanelScaleMult = v / 100
-    updateFit()
-end)
-
-addSlider(cfgTab, "Transparência do fundo (%)", 0, 60, 0, function(v)
-    main.BackgroundTransparency = v / 100
-end)
-
+text(cfgTab, "📏 PAINEL", 12, THEME.SubText, Enum.Font.GothamBold)
+addSlider(cfgTab, "Escala (%)", 60, 130, 100, function(v) PanelScaleMult = v/100; updateFit() end)
+addSlider(cfgTab, "Transparência (%)", 0, 60, 0, function(v) main.BackgroundTransparency = v/100 end)
 text(cfgTab, "✨ COMPORTAMENTO", 12, THEME.SubText, Enum.Font.GothamBold)
-
-addToggle(cfgTab, "✨ Animações ativadas", true, function(v)
-    AnimEnabled = v
-    notify(v and "✨ Animações ON" or "Animações OFF")
-end)
-
-addToggle(cfgTab, "👤 Mostrar perfil", true, function(v)
-    profile.Visible = v
-end)
-
-text(cfgTab, "🔄 RESET", 12, THEME.SubText, Enum.Font.GothamBold)
-
-addButton(cfgTab, "🔄 Resetar painel ao centro", false, function()
-    root.Position = UDim2.fromScale(0.5, 0.5)
-    notify("Painel centralizado")
-end)
-
-addButton(cfgTab, "🔄 Resetar personalização", true, function()
-    PanelScaleMult = 1.0
-    updateFit()
-    main.BackgroundTransparency = 0
-    profile.Visible = true
-    AnimEnabled = true
-    applyTheme(Color3.fromRGB(139, 108, 255), Color3.fromRGB(56, 189, 248))
-    for j, s in ipairs(themeStrokes) do
-        tween(s, { Transparency = (j == 1) and 0 or 1 })
-    end
-    notify("Personalização resetada")
-end)
+addToggle(cfgTab, "✨ Animações", true, function(v) AnimEnabled = v; notify(v and "Animações ON" or "Animações OFF") end)
+addToggle(cfgTab, "👤 Mostrar perfil", true, function(v) profile.Visible = v end)
 
 selectTab("Aim")
 
 -- ==========================================================
---  🔵 BOLINHA DO PAINEL
--- ==========================================================
-local bubble = make("Frame", {
-    Name = "Bubble", Size = UDim2.fromOffset(BUBBLE, BUBBLE),
-    Position = UDim2.fromOffset(16, 180), BackgroundColor3 = THEME.Accent,
-    Visible = false, ZIndex = 50,
-}, gui)
-round(bubble, BUBBLE / 2)
-accentGradient(bubble, 45)
-local bubbleStroke = stroke(bubble, THEME.White, 3, 0.4)
-local bubbleScale = make("UIScale", { Scale = 0 }, bubble)
-
-TweenService:Create(
-    bubbleStroke,
-    TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-    { Transparency = 0.05 }
-):Play()
-
-local ring = make("Frame", {
-    AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-    Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 49,
-}, bubble)
-round(ring, BUBBLE / 2)
-local ringStroke = stroke(ring, THEME.White, 2, 0.35)
-local ringScale = make("UIScale", { Scale = 1 }, ring)
-local ringInfo = TweenInfo.new(1.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, -1, false)
-TweenService:Create(ringScale, ringInfo, { Scale = 1.7 }):Play()
-TweenService:Create(ringStroke, ringInfo, { Transparency = 1 }):Play()
-
-local hit = make("TextButton", {
-    Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
-    Text = "💀", TextColor3 = THEME.White, TextSize = 30,
-    Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 51,
-}, bubble)
-
-local isOpen, busy = false, false
-
-local savedMouseBehavior = nil
-local savedMouseIcon = nil
-
-local function unlockMouse()
-    pcall(function()
-        savedMouseBehavior = UserInputService.MouseBehavior
-        savedMouseIcon = UserInputService.MouseIconEnabled
-        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-        UserInputService.MouseIconEnabled = true
-    end)
-end
-
-local function lockMouse()
-    pcall(function()
-        UserInputService.MouseBehavior = savedMouseBehavior or Enum.MouseBehavior.LockCenter
-        if savedMouseIcon ~= nil then
-            UserInputService.MouseIconEnabled = savedMouseIcon
-        end
-    end)
-end
-
-local function showBubble(show)
-    if show then
-        bubble.Visible = true
-        bubbleScale.Scale = 0
-        tween(bubbleScale, { Scale = 1 }, 0.45, Enum.EasingStyle.Back)
-    else
-        tween(bubbleScale, { Scale = 0 }, 0.18)
-        task.delay(0.2, function()
-            if isOpen then bubble.Visible = false end
-        end)
-    end
-end
-
-local function openWindow()
-    if isOpen or busy then return end
-    busy, isOpen = true, true
-    showBubble(false)
-    root.Visible = true
-    anim.Scale = 0.7
-    tween(anim, { Scale = 1 }, 0.55, Enum.EasingStyle.Back)
-    unlockMouse()
-    task.delay(0.55, function() busy = false end)
-end
-
-local function minimizeWindow()
-    if not isOpen or busy then return end
-    busy, isOpen = true, false
-    tween(anim, { Scale = 0.5 }, 0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-    task.delay(0.27, function()
-        root.Visible = false
-        showBubble(true)
-        busy = false
-        lockMouse()
-    end)
-end
-
-minBtn.Activated:Connect(minimizeWindow)
-
-local function clampPos(x, y)
-    local vp = gui.AbsoluteSize
-    return UDim2.fromOffset(
-        math.clamp(x, 8, math.max(8, vp.X - BUBBLE - 8)),
-        math.clamp(y, 30, math.max(30, vp.Y - BUBBLE - 8))
-    )
-end
-
-connect(gui:GetPropertyChangedSignal("AbsoluteSize"), function()
-    bubble.Position = clampPos(bubble.Position.X.Offset, bubble.Position.Y.Offset)
-end)
-
-do
-    local function snapToSide()
-        local vp = gui.AbsoluteSize
-        local x = bubble.Position.X.Offset
-        local target = (x + BUBBLE / 2 < vp.X / 2) and 10 or (vp.X - BUBBLE - 10)
-        tween(bubble, { Position = UDim2.fromOffset(target, bubble.Position.Y.Offset) }, 0.45, Enum.EasingStyle.Back)
-    end
-
-    local pressing, moved, startMouse, startPos = false, false, nil, nil
-    local justDragged = false
-
-    hit.InputBegan:Connect(function(input)
-        if isPointer(input) then
-            pressing = true
-            moved = false
-            justDragged = false
-            startMouse = input.Position
-            startPos = bubble.Position
-            tween(bubbleScale, { Scale = 0.9 }, 0.1)
-        end
-    end)
-
-    connect(UserInputService.InputChanged, function(input)
-        if pressing and isMove(input) then
-            local d = input.Position - startMouse
-            if not moved and d.Magnitude > 8 then
-                moved = true
-                justDragged = true
-            end
-            if moved then
-                bubble.Position = clampPos(startPos.X.Offset + d.X, startPos.Y.Offset + d.Y)
-            end
-        end
-    end)
-
-    connect(UserInputService.InputEnded, function(input)
-        if not pressing then return end
-        if not isPointer(input) then return end
-        pressing = false
-        tween(bubbleScale, { Scale = 1 }, 0.25, Enum.EasingStyle.Back)
-        if moved then
-            snapToSide()
-            task.delay(0.1, function() justDragged = false end)
-        end
-    end)
-
-    hit.MouseButton1Click:Connect(function()
-        if justDragged then
-            justDragged = false
-            return
-        end
-        openWindow()
-    end)
-end
-
-connect(UserInputService.InputBegan, function(input, processed)
-    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
-    if input.KeyCode == Enum.KeyCode.J or input.KeyCode == Enum.KeyCode.RightShift then
-        if isOpen then minimizeWindow() else openWindow() end
-    end
-end)
-
-player.CharacterAdded:Connect(function()
-    task.wait(0.5)
-    lockTarget, lockPart, lockKind = nil, nil, nil
-    assistTarget, assistPart = nil, nil
-    AIM_LAST_SWITCH = 0
-    AIM_LOCK_START = 0
-end)
-
-ESPRefreshPlayers()
-showBubble(true)
-
-print("✅ Painel Pro v3.1 — 11 abas (Aim, Assist ✨, NPC, Speed, ESP, Noclip, Voo, Fullbright, TP, AutoClick, Config)")
-print("✨ Aim Assist: puxa suave pro inimigo, você ainda controla a mira!")
-print("🔧 Bug do RenderStepped:Wait CORRIGIDO")
