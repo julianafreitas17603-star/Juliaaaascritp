@@ -1,7 +1,6 @@
 -- ==========================================================
---  💀 PAINEL PRO v3.0 — Aim + Speed + ESP + Noclip + Voo + Fullbright + TP + Auto Click FORTE + Config
---  🖱️ Auto Click ativo SÓ enquanto segura o mouse / toque na tela
---  🔥 Modo FORTE com CPS alto
+--  💀 PAINEL PRO v3.1 — Aim 100% + Aim Assist + Aim NPC + Speed + ESP + Noclip + Voo + Fullbright + TP + AutoClick + Config
+--  ✨ NOVO: Aim Assist controlável com a mira
 -- ==========================================================
 
 repeat task.wait(0.1) until game:IsLoaded()
@@ -13,6 +12,7 @@ local RunService       = game:GetService("RunService")
 local Stats            = game:GetService("Stats")
 local Lighting         = game:GetService("Lighting")
 local VirtualUser      = game:GetService("VirtualUser")
+local CollectionService= game:GetService("CollectionService")
 
 local player    = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -187,7 +187,7 @@ make("TextLabel", {
 make("TextLabel", {
     BackgroundTransparency = 1, Position = UDim2.fromOffset(60, 31),
     Size = UDim2.new(1, -120, 0, 16),
-    Text = "Aim • Speed • ESP • Noclip • Voo • Fullbright • TP • AutoClick", TextColor3 = THEME.SubText, TextSize = 12,
+    Text = "Aim • Assist • NPC • Speed • ESP • Noclip • Voo • TP", TextColor3 = THEME.SubText, TextSize = 11,
     Font = Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left,
 }, top)
 
@@ -236,9 +236,9 @@ round(sidebar, 14)
 stroke(sidebar, THEME.White, 1, 0.88)
 
 local tabHolder = make("Frame", { Size = UDim2.new(1, 0, 1, -64), BackgroundTransparency = 1 }, sidebar)
-make("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }, tabHolder)
+make("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }, tabHolder)
 make("UIPadding", {
-    PaddingTop = UDim.new(0, 8), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8),
+    PaddingTop = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6),
 }, tabHolder)
 
 local profile = make("Frame", {
@@ -301,14 +301,14 @@ end
 
 local function newTab(name, icon, tabOrder)
     local btn = make("TextButton", {
-        Size = UDim2.new(1, 0, 0, 32), BackgroundColor3 = THEME.Accent,
+        Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = THEME.Accent,
         BackgroundTransparency = 1, Text = icon .. "  " .. name,
-        TextColor3 = THEME.SubText, TextSize = 13, Font = Enum.Font.GothamBold,
+        TextColor3 = THEME.SubText, TextSize = 12, Font = Enum.Font.GothamBold,
         TextXAlignment = Enum.TextXAlignment.Left, AutoButtonColor = false,
         LayoutOrder = tabOrder,
     }, tabHolder)
     round(btn, 10)
-    make("UIPadding", { PaddingLeft = UDim.new(0, 10) }, btn)
+    make("UIPadding", { PaddingLeft = UDim.new(0, 8) }, btn)
     themed(function() btn.BackgroundColor3 = THEME.Accent end)
 
     btn.MouseEnter:Connect(function()
@@ -578,18 +578,126 @@ local function IsAliveHumanoid(h)
 end
 
 -- ==========================================================
---  🎯 AIM
+--  🎯 AIM (Players + NPCs)
 -- ==========================================================
 local ACONFIG = {
-    Enabled=false, MaxDistance=5000, FOV=360, TeamCheck=true,
+    EnabledPlayers=false, EnabledNPCs=false,
+    MaxDistance=5000, FOV=360, TeamCheck=true,
     Prediction=false, PredictionSpeed=400, Smoothness=0,
     AutoFire=false, AFCooldownMin=0.08, AFCooldownMax=0.15, AFMinDot=0.85,
     SmartSwitch=true, WeightDistance=1.0, WeightAngle=0.35,
     SwitchMargin=3, SwitchCooldown=0.08, MaxLockTime=5,
+    OnlyZombies=false,
 }
+
+-- ==========================================================
+--  ✨ AIM ASSIST (NOVO — suave, controlável)
+-- ==========================================================
+local ASSIST = {
+    Enabled = false,          -- se liga, funciona quando o aim 100% está desligado
+    Strength = 0.35,          -- 0.05 (bem leve) até 1 (quase colado)
+    FOV = 90,                 -- só mira em quem tá nesse ângulo
+    MaxDistance = 800,
+    TeamCheck = true,
+    Prediction = false,       -- igual ao do aim principal
+    PredictionSpeed = 400,
+    SmoothStrength = 6,       -- quantas vezes por segundo ele reajusta (mais alto = mais responsivo)
+}
+
+local NPC_CACHE = {}
+local NPC_CACHE_TIME = 0
+
+local ZOMBIE_KEYWORDS = {
+    "zombie","zumbi","walker","undead","infected","ghoul","monster","mob","enemy","npc","bot","dummy",
+    "creature","hostile","demon","skeleton","target","training","test",
+    "morto","infectado","monstro","inimigo","criatura","esqueleto","fantasma",
+    "chefe","horda","onda","ataque","carniceiro","mutante","podre",
+    "boneco","puppet","manequim","stand","clone","sombra",
+}
+local ZOMBIE_FOLDERS = {
+    "zombie","zumbi","mob","enemy","inimigo","monster","monstro","npc","bots","dummy","dummies",
+    "creature","spawn","hostile","horda","onda","ataque","spawner",
+    "bonecos","boneco","puppets","puppet","stands","stand","clones","clone",
+}
+
+local function NameHasZombieKeyword(nome)
+    local lower = string.lower(tostring(nome))
+    for _, kw in ipairs(ZOMBIE_KEYWORDS) do
+        if string.find(lower, kw, 1, true) then return true end
+    end
+    return false
+end
+local function IsInsideZombieFolder(model)
+    local p = model.Parent
+    local depth = 0
+    while p and p ~= workspace and depth < 4 do
+        local lower = string.lower(p.Name)
+        for _, kw in ipairs(ZOMBIE_FOLDERS) do
+            if string.find(lower, kw, 1, true) then return true end
+        end
+        p = p.Parent
+        depth = depth + 1
+    end
+    return false
+end
+local function IsPlayerCharacter(model)
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character == model then return true end
+    end
+    return false
+end
+local function IsNPC(model)
+    if not model or not model.Parent then return false end
+    if not model:IsA("Model") then return false end
+    if IsPlayerCharacter(model) then return false end
+    if player.Character == model then return false end
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    if not IsAliveHumanoid(hum) then return false end
+    if not ACONFIG.OnlyZombies then return true end
+    if NameHasZombieKeyword(model.Name) then return true end
+    if IsInsideZombieFolder(model) then return true end
+    if model.Parent and NameHasZombieKeyword(model.Parent.Name) then return true end
+    if hum.WalkSpeed and hum.WalkSpeed > 0 and hum.WalkSpeed ~= 16 then return true end
+    for _, tag in ipairs(CollectionService:GetTags(model)) do
+        local lt = string.lower(tag)
+        if string.find(lt,"zombie") or string.find(lt,"zumbi") or string.find(lt,"enemy") or string.find(lt,"inimigo") then return true end
+    end
+    local head  = model:FindFirstChild("Head")
+    local torso = model:FindFirstChild("Torso") or model:FindFirstChild("UpperTorso")
+    if head and torso and hum.Health > 0 and hum.MaxHealth > 0 then
+        if not model:FindFirstChild("leaderstats") then return true end
+    end
+    return false
+end
+local function NPCGetPart(model)
+    if not IsNPC(model) then return nil end
+    local part = model:FindFirstChild("Head")
+    if part then return part end
+    for _, n in ipairs({"UpperTorso","Torso","HumanoidRootPart","LowerTorso"}) do
+        local p = model:FindFirstChild(n)
+        if p and p:IsA("BasePart") then return p end
+    end
+    if model.PrimaryPart then return model.PrimaryPart end
+    for _, p in ipairs(model:GetDescendants()) do
+        if p:IsA("BasePart") then return p end
+    end
+    return nil
+end
+local function RefreshNPCCache()
+    local now = tick()
+    if now - NPC_CACHE_TIME < 0.5 then return end
+    NPC_CACHE_TIME = now
+    local list = {}
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if IsNPC(obj) then table.insert(list, obj) end
+    end
+    NPC_CACHE = list
+end
+local function GetAllNPCs() RefreshNPCCache(); return NPC_CACHE end
+
 local AIM_LAST_SWITCH = 0
 local AIM_LOCK_START  = 0
-local lockTarget, lockPart = nil, nil
+local lockTarget, lockPart, lockKind = nil, nil, nil
 local lastFire = 0
 
 local function TryAutoFire()
@@ -635,114 +743,231 @@ end
 
 local function FindBestTarget()
     local mp, ml = Camera.CFrame.Position, Camera.CFrame.LookVector
-    local best, bestPart, bestScore, bestDist = nil, nil, math.huge, nil
-    for _, plr in ipairs(Players:GetPlayers()) do
-        local part = GetPlayerPart(plr)
-        if part then
-            local to = part.Position - mp
-            local d = to.Magnitude
-            if d <= ACONFIG.MaxDistance then
-                local ang = AngleBetween(ml, to)
-                if ang <= ACONFIG.FOV then
-                    local score = d * ACONFIG.WeightDistance + ang * ACONFIG.WeightAngle
-                    if score < bestScore then
-                        bestScore, best, bestPart, bestDist = score, plr, part, d
+    local best, bestPart, bestScore, bestDist, bestKind = nil, nil, math.huge, nil, nil
+
+    if ACONFIG.EnabledPlayers then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            local part = GetPlayerPart(plr)
+            if part then
+                local to = part.Position - mp
+                local d = to.Magnitude
+                if d <= ACONFIG.MaxDistance then
+                    local ang = AngleBetween(ml, to)
+                    if ang <= ACONFIG.FOV then
+                        local score = d * ACONFIG.WeightDistance + ang * ACONFIG.WeightAngle
+                        if score < bestScore then
+                            bestScore, best, bestPart, bestDist, bestKind = score, plr, part, d, "player"
+                        end
                     end
                 end
             end
         end
     end
-    return best, bestPart, bestScore, bestDist
+
+    if ACONFIG.EnabledNPCs then
+        for _, npc in ipairs(GetAllNPCs()) do
+            local part = NPCGetPart(npc)
+            if part then
+                local to = part.Position - mp
+                local d = to.Magnitude
+                if d <= ACONFIG.MaxDistance then
+                    local ang = AngleBetween(ml, to)
+                    if ang <= ACONFIG.FOV then
+                        local score = d * ACONFIG.WeightDistance + ang * ACONFIG.WeightAngle
+                        if score < bestScore then
+                            bestScore, best, bestPart, bestDist, bestKind = score, npc, part, d, "npc"
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return best, bestPart, bestScore, bestDist, bestKind
 end
 
-local function GetDistToTarget(plr)
-    local part = GetPlayerPart(plr)
-    if not part then return nil end
-    return (part.Position - Camera.CFrame.Position).Magnitude
+local function GetDistToTarget()
+    if not lockPart then return nil end
+    return (lockPart.Position - Camera.CFrame.Position).Magnitude
 end
 
+-- ==========================================================
+--  ✨ AIM ASSIST — função separada pra calcular alvo e aplicar
+-- ==========================================================
+local assistTarget, assistPart = nil, nil
+
+local function AssistFindTarget()
+    local mp, ml = Camera.CFrame.Position, Camera.CFrame.LookVector
+    local best, bestPart, bestDist = nil, nil, math.huge
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= player then
+            -- team check
+            local ok = true
+            if ASSIST.TeamCheck then
+                local m, h = GetTeamKey(player), GetTeamKey(plr)
+                if m and h then ok = (m ~= h) else ok = false end
+            end
+            if ok then
+                local char = plr.Character
+                local hum  = char and char:FindFirstChildOfClass("Humanoid")
+                if IsAliveHumanoid(hum) then
+                    local part = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart
+                    if part then
+                        local to = part.Position - mp
+                        local d = to.Magnitude
+                        if d <= ASSIST.MaxDistance then
+                            local ang = AngleBetween(ml, to)
+                            if ang <= ASSIST.FOV then
+                                if d < bestDist then
+                                    bestDist, best, bestPart = d, plr, part
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return best, bestPart
+end
+
+-- ==========================================================
+--  UPDATE AIM UNIFICADO (100% tem prioridade, senão assist)
+-- ==========================================================
 local function UpdateLock()
-    if not ACONFIG.Enabled then
-        lockTarget, lockPart = nil, nil
+    local myChar = player.Character
+    if not myChar then
+        lockTarget, lockPart, lockKind = nil, nil, nil
+        assistTarget, assistPart = nil, nil
+        return
+    end
+    local myHum = myChar:FindFirstChildOfClass("Humanoid")
+    if not IsAliveHumanoid(myHum) then
+        lockTarget, lockPart, lockKind = nil, nil, nil
+        assistTarget, assistPart = nil, nil
         return
     end
 
-    local myChar = player.Character
-    if not myChar then lockTarget, lockPart = nil, nil return end
-    local myHum = myChar:FindFirstChildOfClass("Humanoid")
-    if not IsAliveHumanoid(myHum) then lockTarget, lockPart = nil, nil return end
+    -----------------------------------------------------------------
+    -- 🎯 MODO 1: AIM 100% (mantido intacto, prioridade máxima)
+    -----------------------------------------------------------------
+    if ACONFIG.EnabledPlayers or ACONFIG.EnabledNPCs then
 
-    if lockTarget then
-        local p = GetPlayerPart(lockTarget)
-        if not p then lockTarget, lockPart = nil, nil
-        else lockPart = p end
-    end
+        -- revalida alvo atual
+        if lockTarget then
+            local stillOk = false
+            if lockKind == "player" then
+                stillOk = IsEnemy(lockTarget) and (GetPlayerPart(lockTarget) ~= nil)
+            elseif lockKind == "npc" then
+                stillOk = (lockTarget.Parent ~= nil) and IsNPC(lockTarget) and (NPCGetPart(lockTarget) ~= nil)
+            end
+            if stillOk then
+                if lockKind == "player" then lockPart = GetPlayerPart(lockTarget)
+                else lockPart = NPCGetPart(lockTarget) end
+            else
+                lockTarget, lockPart, lockKind = nil, nil, nil
+            end
+        end
 
-    local now = tick()
-    if ACONFIG.SmartSwitch then
-        if now - AIM_LAST_SWITCH >= ACONFIG.SwitchCooldown then
-            local best, bestPart, _, bestDist = FindBestTarget()
-            if best and bestPart then
-                local shouldSwitch = false
-                if not lockTarget then
-                    shouldSwitch = true
-                else
-                    local curDist = GetDistToTarget(lockTarget)
-                    if curDist then
-                        if best ~= lockTarget and bestDist and (curDist - bestDist) >= ACONFIG.SwitchMargin then
+        local now = tick()
+        if ACONFIG.SmartSwitch then
+            if now - AIM_LAST_SWITCH >= ACONFIG.SwitchCooldown then
+                local best, bestPart, _, bestDist, bestKind = FindBestTarget()
+                if best and bestPart then
+                    local shouldSwitch = false
+                    if not lockTarget then
+                        shouldSwitch = true
+                    else
+                        local curDist = GetDistToTarget()
+                        if curDist then
+                            if best ~= lockTarget and bestDist and (curDist - bestDist) >= ACONFIG.SwitchMargin then
+                                shouldSwitch = true
+                            end
+                            if (now - AIM_LOCK_START) > ACONFIG.MaxLockTime then
+                                if best ~= lockTarget then shouldSwitch = true end
+                            end
+                        else
                             shouldSwitch = true
                         end
-                        if (now - AIM_LOCK_START) > ACONFIG.MaxLockTime then
-                            if best ~= lockTarget then shouldSwitch = true end
-                        end
-                    else
-                        shouldSwitch = true
+                    end
+                    if shouldSwitch then
+                        lockTarget, lockPart, lockKind = best, bestPart, bestKind
+                        AIM_LAST_SWITCH = now
+                        AIM_LOCK_START = now
                     end
                 end
-                if shouldSwitch then
-                    lockTarget, lockPart = best, bestPart
+            end
+        else
+            if not lockTarget then
+                local best, bestPart, _, _, bestKind = FindBestTarget()
+                if best and bestPart then
+                    lockTarget, lockPart, lockKind = best, bestPart, bestKind
                     AIM_LAST_SWITCH = now
                     AIM_LOCK_START = now
                 end
             end
         end
-    else
-        if not lockTarget then
-            local best, bestPart = FindBestTarget()
-            if best and bestPart then
-                lockTarget, lockPart = best, bestPart
-                AIM_LAST_SWITCH = now
-                AIM_LOCK_START = now
+
+        if lockTarget and lockPart then
+            local mp = Camera.CFrame.Position
+            local aimPos = lockPart.Position
+            if ACONFIG.Prediction then
+                local vel = lockPart.AssemblyLinearVelocity
+                local dist = (aimPos - mp).Magnitude
+                aimPos = aimPos + vel * (dist / math.max(ACONFIG.PredictionSpeed, 1))
             end
+            local des = CFrame.lookAt(mp, aimPos)
+            if ACONFIG.Smoothness <= 0 then
+                Camera.CFrame = des
+            else
+                Camera.CFrame = Camera.CFrame:Lerp(des, 1 - ACONFIG.Smoothness)
+            end
+            TryAutoFire()
         end
+        return -- se o aim 100% tá ligado, nem entra no assist
     end
 
-    if not lockTarget or not lockPart then return end
+    -----------------------------------------------------------------
+    -- ✨ MODO 2: AIM ASSIST (suave, controlável)
+    -----------------------------------------------------------------
+    if ASSIST.Enabled then
+        assistTarget, assistPart = AssistFindTarget()
+        if assistTarget and assistPart then
+            local mp = Camera.CFrame.Position
+            local aimPos = assistPart.Position
+            if ASSIST.Prediction then
+                local vel = assistPart.AssemblyLinearVelocity
+                local dist = (aimPos - mp).Magnitude
+                aimPos = aimPos + vel * (dist / math.max(ASSIST.PredictionSpeed, 1))
+            end
+            local des = CFrame.lookAt(mp, aimPos)
 
-    local mp = Camera.CFrame.Position
-    local aimPos = lockPart.Position
-    if ACONFIG.Prediction then
-        local vel = lockPart.AssemblyLinearVelocity
-        local dist = (aimPos - mp).Magnitude
-        aimPos = aimPos + vel * (dist / math.max(ACONFIG.PredictionSpeed, 1))
+            -- 💡 Aplica uma fração do movimento, o resto deixa o jogador controlar
+            -- Strength = 0.05 (quase nada) até 1 (quase colado)
+            local strength = math.clamp(ASSIST.Strength, 0, 1)
+            -- Multiplica por um fator de tempo pra ficar consistente com FPS
+            local dt = RunService.RenderStepped:Wait and 0.016 or 0.016
+            local factor = math.clamp(strength * (ASSIST.SmoothStrength / 60), 0, 0.9)
+            Camera.CFrame = Camera.CFrame:Lerp(des, factor)
+        end
+        return
     end
-    local des = CFrame.lookAt(mp, aimPos)
-    if ACONFIG.Smoothness <= 0 then
-        Camera.CFrame = des
-    else
-        Camera.CFrame = Camera.CFrame:Lerp(des, 1 - ACONFIG.Smoothness)
-    end
-    TryAutoFire()
+
+    -- Nenhum dos dois ligados: limpa
+    lockTarget, lockPart, lockKind = nil, nil, nil
+    assistTarget, assistPart = nil, nil
 end
 
 RunService:BindToRenderStep("AimUnified", Enum.RenderPriority.Last.Value, UpdateLock)
 
 local function MaybeClearLock()
-    if not ACONFIG.Enabled then
-        lockTarget, lockPart = nil, nil
+    if not ACONFIG.EnabledPlayers and not ACONFIG.EnabledNPCs then
+        lockTarget, lockPart, lockKind = nil, nil, nil
         AIM_LAST_SWITCH = 0
         AIM_LOCK_START = 0
     end
+    assistTarget, assistPart = nil, nil
 end
 
 -- ==========================================================
@@ -1257,91 +1482,139 @@ local function TeleportTo(pos)
 end
 
 -- ==========================================================
---  🖱️ AUTO CLICKER — FORTE (segurar mouse/toque)
+--  🖱️ AUTO CLICKER — BOLINHA DE TOQUE
 -- ==========================================================
 local AutoClick = {
-    Enabled = false,
-    CPS = 200,           -- 🔥 padrão alto
-    MaxCPS = 1000,       -- 🔥 máximo absoluto
-    Active = false,
-    Thread = nil,
-    LastClick = 0,
+    Enabled = false, CPS = 30, Thread = nil, Touching = false, BubbleVisible = false,
 }
-local autoClickThread = nil
+local AC_BUBBLE = 80
 
-local function AutoClickStop()
-    if autoClickThread then
-        task.cancel(autoClickThread)
-        autoClickThread = nil
+local acBubble = make("Frame", {
+    Name = "AutoClickBubble",
+    Size = UDim2.fromOffset(AC_BUBBLE, AC_BUBBLE),
+    Position = UDim2.fromOffset(200, 300),
+    BackgroundColor3 = Color3.fromRGB(239, 68, 68),
+    Visible = false,
+    ZIndex = 60,
+}, gui)
+round(acBubble, AC_BUBBLE / 2)
+make("UIGradient", {
+    Color = ColorSequence.new(Color3.fromRGB(239, 68, 68), Color3.fromRGB(250, 204, 21)),
+    Rotation = 45,
+}, acBubble)
+stroke(acBubble, THEME.White, 3, 0.2)
+local acScale = make("UIScale", { Scale = 0 }, acBubble)
+make("TextLabel", {
+    BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1),
+    Text = "👆", TextColor3 = THEME.White, TextSize = 38,
+    Font = Enum.Font.GothamBold, ZIndex = 61,
+}, acBubble)
+
+local acRing = make("Frame", {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.5),
+    Size = UDim2.fromScale(1, 1),
+    BackgroundTransparency = 1,
+    ZIndex = 59,
+}, acBubble)
+round(acRing, AC_BUBBLE / 2)
+local acRingStroke = stroke(acRing, Color3.fromRGB(239, 68, 68), 2, 0.3)
+local acRingScale = make("UIScale", { Scale = 1 }, acRing)
+local acRingInfo = TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, -1, false)
+TweenService:Create(acRingScale, acRingInfo, { Scale = 1.6 }):Play()
+TweenService:Create(acRingStroke, acRingInfo, { Transparency = 1 }):Play()
+
+local acHit = make("TextButton", {
+    Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", ZIndex = 62,
+}, acBubble)
+
+local function ACStartClickLoop()
+    if AutoClick.Thread then return end
+    AutoClick.Thread = task.spawn(function()
+        while AutoClick.Touching and AutoClick.Enabled do
+            pcall(function() VirtualUser:Button1Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame) end)
+            pcall(function() VirtualUser:Button1Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame) end)
+            task.wait(1 / math.max(AutoClick.CPS, 1))
+        end
+        AutoClick.Thread = nil
+    end)
+end
+local function ACStopClickLoop() AutoClick.Touching = false end
+
+local function ACShowBubble(show)
+    AutoClick.BubbleVisible = show
+    if show then
+        acBubble.Visible = true
+        acScale.Scale = 0
+        tween(acScale, { Scale = 1 }, 0.35, Enum.EasingStyle.Back)
+    else
+        tween(acScale, { Scale = 0 }, 0.2)
+        task.delay(0.22, function()
+            if not AutoClick.BubbleVisible then acBubble.Visible = false end
+        end)
+        ACStopClickLoop()
     end
 end
 
--- 🔥 Loop FORTE: clica o máximo possível por frame
-local function AutoClickStart()
-    AutoClickStop()
-    autoClickThread = task.spawn(function()
-        while AutoClick.Enabled do
-            if AutoClick.Active then
-                -- Calcula quantos cliques cabem no intervalo até o próximo CPS
-                local cps = math.max(AutoClick.CPS, 1)
-                local delay = 1 / cps
-
-                -- Dispara o clique no mesmo frame
-                pcall(function()
-                    VirtualUser:Button1Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-                end)
-                pcall(function()
-                    VirtualUser:Button1Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-                end)
-
-                -- Espera o delay (mas se delay é minúsculo, não trava)
-                if delay > 0 then
-                    task.wait(delay)
-                else
-                    RunService.Heartbeat:Wait()
-                end
-            else
-                -- Se não está segurando, espera um pouco pra não consumir CPU
-                RunService.Heartbeat:Wait()
+do
+    local dragging, dragStart, startPos
+    local moved = false
+    acHit.InputBegan:Connect(function(input)
+        if isPointer(input) then
+            dragging = true; moved = false
+            dragStart = input.Position; startPos = acBubble.Position
+            if AutoClick.Enabled then
+                AutoClick.Touching = true
+                ACStartClickLoop()
+                tween(acScale, { Scale = 0.9 }, 0.08)
             end
         end
     end)
+    connect(UserInputService.InputChanged, function(input)
+        if dragging and isMove(input) then
+            local d = input.Position - dragStart
+            if not moved and d.Magnitude > 8 then
+                moved = true
+                ACStopClickLoop()
+                tween(acScale, { Scale = 1 }, 0.15)
+            end
+            if moved then
+                local vp = gui.AbsoluteSize
+                local nx = math.clamp(startPos.X.Offset + d.X, 8, vp.X - AC_BUBBLE - 8)
+                local ny = math.clamp(startPos.Y.Offset + d.Y, 30, vp.Y - AC_BUBBLE - 8)
+                acBubble.Position = UDim2.fromOffset(nx, ny)
+            end
+        end
+    end)
+    connect(UserInputService.InputEnded, function(input)
+        if not dragging then return end
+        if not isPointer(input) then return end
+        dragging = false
+        tween(acScale, { Scale = 1 }, 0.15)
+        ACStopClickLoop()
+    end)
 end
-
--- ✅ Detecta segurar/soltar mouse ou touch
-connect(UserInputService.InputBegan, function(input, processed)
-    if not AutoClick.Enabled then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-       or input.UserInputType == Enum.UserInputType.Touch then
-        AutoClick.Active = true
-    end
-end)
-
 connect(UserInputService.InputEnded, function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
        or input.UserInputType == Enum.UserInputType.Touch then
-        AutoClick.Active = false
+        ACStopClickLoop()
     end
 end)
 
 -- ==========================================================
---  🎯 ABA AIM
+--  🎯 ABA AIM PLAYERS
 -- ==========================================================
 local aimTab = newTab("Aim", "🎯", 1)
-text(aimTab, "Aimbot Players", 20, THEME.Text, Enum.Font.GothamBold)
-text(aimTab, "Cola no inimigo. IA de troca incluída.", 12, THEME.SubText)
+text(aimTab, "Aimbot Players (100%)", 20, THEME.Text, Enum.Font.GothamBold)
+text(aimTab, "Cola no inimigo — hard lock.", 12, THEME.SubText)
 
-addToggle(aimTab, "🎯 Ativar Aim", false, function(v)
-    ACONFIG.Enabled = v
+addToggle(aimTab, "🎯 Ativar Aim 100% em Players", false, function(v)
+    ACONFIG.EnabledPlayers = v
     MaybeClearLock()
-    notify(v and "Aim ATIVADO" or "Aim desativado")
+    notify(v and "🎯 Aim Players ON" or "Aim Players OFF")
 end)
-addToggle(aimTab, "🛡️ Team Check (não mira aliados)", true, function(v) ACONFIG.TeamCheck = v end)
-addToggle(aimTab, "🧠 IA de troca (sempre o mais próximo)", true, function(v)
-    ACONFIG.SmartSwitch = v
-    notify(v and "🧠 IA de troca ON" or "IA de troca OFF")
-end)
-addToggle(aimTab, "🎯 Predição (mira na frente)", false, function(v) ACONFIG.Prediction = v end)
+addToggle(aimTab, "🛡️ Team Check", true, function(v) ACONFIG.TeamCheck = v end)
+addToggle(aimTab, "🎯 Predição", false, function(v) ACONFIG.Prediction = v end)
 addToggle(aimTab, "🔥 Auto Fire", false, function(v) ACONFIG.AutoFire = v end)
 
 addSlider(aimTab, "FOV (graus)", 5, 360, 360, function(v) ACONFIG.FOV = v end)
@@ -1349,18 +1622,70 @@ addSlider(aimTab, "Distância máx", 20, 8000, 5000, function(v) ACONFIG.MaxDist
 addSlider(aimTab, "Velocidade da bala", 50, 3000, 400, function(v) ACONFIG.PredictionSpeed = v end)
 addSlider(aimTab, "Suavidade (0 = colado)", 0, 1, 0, function(v) ACONFIG.Smoothness = v end, 2)
 
-text(aimTab, "🧠 IA DE TROCA", 12, THEME.SubText, Enum.Font.GothamBold)
-addSlider(aimTab, "Velocidade de troca (ms)", 30, 500, 80, function(v) ACONFIG.SwitchCooldown = v / 1000 end)
-addSlider(aimTab, "Margem p/ trocar (studs)", 0, 30, 3, function(v) ACONFIG.SwitchMargin = v end)
-addSlider(aimTab, "Peso da distância", 0.1, 5, 1.0, function(v) ACONFIG.WeightDistance = v end, 1)
-addSlider(aimTab, "Peso do ângulo", 0, 3, 0.35, function(v) ACONFIG.WeightAngle = v end, 2)
+text(aimTab, "💡 Esse é o aim 100% que você gostou. Se quiser algo mais suave, use o Aim Assist.", 12, Color3.fromRGB(250, 204, 21))
+
+-- ==========================================================
+--  ✨ ABA AIM ASSIST (NOVA)
+-- ==========================================================
+local assistTab = newTab("Assist", "✨", 2)
+text(assistTab, "Aim Assist (suave)", 20, THEME.Text, Enum.Font.GothamBold)
+text(assistTab, "Puxa a mira suavemente pro inimigo — você ainda controla.", 12, THEME.SubText)
+
+addToggle(assistTab, "✨ Ativar Aim Assist", false, function(v)
+    ASSIST.Enabled = v
+    if v then
+        notify("✨ Aim Assist ON — força " .. math.floor(ASSIST.Strength * 100) .. "%")
+    else
+        notify("✨ Aim Assist OFF")
+    end
+end)
+addToggle(assistTab, "🛡️ Team Check", true, function(v) ASSIST.TeamCheck = v end)
+addToggle(assistTab, "🎯 Predição", false, function(v) ASSIST.Prediction = v end)
+
+addSlider(assistTab, "Força do Assist (%)", 5, 100, 35, function(v)
+    ASSIST.Strength = v / 100
+end)
+
+addSlider(assistTab, "FOV do Assist", 5, 360, 90, function(v) ASSIST.FOV = v end)
+addSlider(assistTab, "Distância máx", 50, 5000, 800, function(v) ASSIST.MaxDistance = v end)
+addSlider(assistTab, "Velocidade da bala (predição)", 50, 3000, 400, function(v) ASSIST.PredictionSpeed = v end)
+addSlider(assistTab, "Reajuste (suavidade)", 1, 30, 6, function(v) ASSIST.SmoothStrength = v end)
+
+text(assistTab, "💡 IMPORTANTE:", 12, THEME.SubText, Enum.Font.GothamBold)
+text(assistTab, "• Assist só funciona se o Aim 100% (Players/NPCs) estiver DESLIGADO.\n• Força baixa (10-30%) = você controla mais.\n• Força alta (60-100%) = quase colado, mas você ainda pode ajustar.\n• Reajuste baixo = movimento mais macio.\n• Reajuste alto = responde mais rápido.", 12, Color3.fromRGB(250, 204, 21))
+
+-- ==========================================================
+--  👹 ABA AIM NPC
+-- ==========================================================
+local npcTab = newTab("Aim NPC", "👹", 3)
+text(npcTab, "Aimbot NPCs", 20, THEME.Text, Enum.Font.GothamBold)
+text(npcTab, "Cola em NPCs / zumbis / bonecos.", 12, THEME.SubText)
+
+addToggle(npcTab, "👹 Ativar Aim 100% em NPCs", false, function(v)
+    ACONFIG.EnabledNPCs = v
+    MaybeClearLock()
+    notify(v and "👹 Aim NPCs ON" or "Aim NPCs OFF")
+end)
+addToggle(npcTab, "🧟 Só zumbis / bonecos", false, function(v)
+    ACONFIG.OnlyZombies = v
+    NPC_CACHE_TIME = 0
+    notify(v and "🧟 Só zumbis ON" or "Todos os NPCs")
+end)
+
+addButton(npcTab, "🔍 Contar NPCs no mapa", true, function()
+    NPC_CACHE_TIME = 0
+    local npcs = GetAllNPCs()
+    notify("👹 " .. #npcs .. " NPCs encontrados")
+end)
+
+text(npcTab, "💡 Se ligar junto com Aim Players, escolhe o mais próximo entre os dois.", 12, Color3.fromRGB(250, 204, 21))
 
 -- ==========================================================
 --  ⚡ ABA SPEED
 -- ==========================================================
-local spdTab = newTab("Speed", "⚡", 2)
+local spdTab = newTab("Speed", "⚡", 4)
 text(spdTab, "Speed / Pulo / FOV", 20, THEME.Text, Enum.Font.GothamBold)
-text(spdTab, "Ajustes persistentes — sobrevivem ao respawn.", 12, THEME.SubText)
+text(spdTab, "Ajustes persistentes.", 12, THEME.SubText)
 
 addToggle(spdTab, "⚡ Ativar Speed personalizado", false, function(v)
     ConfigState.SpeedEnabled = v
@@ -1409,7 +1734,7 @@ addSlider(spdTab, "Força do Pulo", 50, 500, 50, function(v)
     end
 end)
 
-addToggle(spdTab, "📷 Ativar FOV personalizado", false, function(v)
+addToggle(spdTab, "📷 FOV personalizado", false, function(v)
     ConfigState.FOVEnabled = v
     if Camera then
         if v then Camera.FieldOfView = ConfigState.FOVValue
@@ -1427,16 +1752,16 @@ end)
 -- ==========================================================
 --  👁️ ABA ESP
 -- ==========================================================
-local espTab = newTab("ESP", "👁️", 3)
+local espTab = newTab("ESP", "👁️", 5)
 text(espTab, "ESP — Antena Neon", 20, THEME.Text, Enum.Font.GothamBold)
-text(espTab, "Coluna neon + Highlight nos inimigos.", 12, THEME.SubText)
+text(espTab, "Coluna neon nos inimigos.", 12, THEME.SubText)
 
 addToggle(espTab, "👁️ Ativar ESP", true, function(v)
     ESPEnabled = v
     if v then ESPRefreshPlayers() else ESPClearAll() end
     notify(v and "👁️ ESP ON" or "ESP OFF")
 end)
-addToggle(espTab, "🛡️ Só time inimigo (não mostra aliados)", true, function(v)
+addToggle(espTab, "🛡️ Só time inimigo", true, function(v)
     ESPMustHaveTeam = v
     ESPClearAll()
     ESPRefreshPlayers()
@@ -1482,9 +1807,9 @@ colorStrokes[1].Transparency = 0
 -- ==========================================================
 --  🧱 ABA NOCLIP
 -- ==========================================================
-local noclipTab = newTab("Noclip", "🧱", 4)
+local noclipTab = newTab("Noclip", "🧱", 6)
 text(noclipTab, "Noclip", 20, THEME.Text, Enum.Font.GothamBold)
-text(noclipTab, "Atravessa paredes e objetos. Persiste no respawn.", 12, THEME.SubText)
+text(noclipTab, "Atravessa paredes.", 12, THEME.SubText)
 
 addToggle(noclipTab, "🧱 Ativar Noclip", false, function(v)
     NoclipEnabled = v
@@ -1501,9 +1826,9 @@ end)
 -- ==========================================================
 --  🚀 ABA VOO
 -- ==========================================================
-local vooTab = newTab("Voo", "🚀", 5)
+local vooTab = newTab("Voo", "🚀", 7)
 text(vooTab, "Voo", 20, THEME.Text, Enum.Font.GothamBold)
-text(vooTab, "Voe livre pelo mapa. Persiste no respawn.", 12, THEME.SubText)
+text(vooTab, "Voe livre.", 12, THEME.SubText)
 
 addToggle(vooTab, "🚀 Ativar Voo", false, function(v)
     if v then
@@ -1519,9 +1844,9 @@ addSlider(vooTab, "Velocidade do Voo", 20, 800, 60, function(v) FlySpeed = v end
 -- ==========================================================
 --  🔦 ABA FULLBRIGHT
 -- ==========================================================
-local fullTab = newTab("Fullbright", "🔦", 6)
+local fullTab = newTab("Fullbright", "🔦", 8)
 text(fullTab, "Fullbright", 20, THEME.Text, Enum.Font.GothamBold)
-text(fullTab, "Clareia o mapa inteiro sem estourar a luz.", 12, THEME.SubText)
+text(fullTab, "Clareia o mapa.", 12, THEME.SubText)
 
 addToggle(fullTab, "🔦 Ativar Fullbright", false, function(v)
     FullbrightEnabled = v
@@ -1537,9 +1862,9 @@ end)
 -- ==========================================================
 --  📍 ABA TP
 -- ==========================================================
-local tpTab = newTab("TP", "📍", 7)
+local tpTab = newTab("TP", "📍", 9)
 text(tpTab, "Teleportes", 20, THEME.Text, Enum.Font.GothamBold)
-text(tpTab, "Salve pontos e volte pra eles quando quiser.", 12, THEME.SubText)
+text(tpTab, "Salve pontos e volte pra eles.", 12, THEME.SubText)
 
 addButton(tpTab, "📍 Salvar Posição Atual", true, function()
     local c = player.Character
@@ -1645,56 +1970,49 @@ _G.RefreshTPList = function()
 end
 _G.RefreshTPList()
 
-text(tpTab, "💡 Salve a posição, dê um nome mental e clique em IR pra voltar.\n⚠️ Pontos são apagados ao reiniciar o script.", 12, Color3.fromRGB(250, 204, 21))
-
 -- ==========================================================
---  🖱️ ABA AUTO CLICK — FORTE
+--  🖱️ ABA AUTO CLICK
 -- ==========================================================
-local acTab = newTab("Auto Click", "🖱️", 8)
-text(acTab, "Auto Clicker FORTE 🔥", 20, THEME.Text, Enum.Font.GothamBold)
-text(acTab, "Clica MUITO rápido enquanto você segura o mouse / toca a tela.", 12, THEME.SubText)
+local acTab = newTab("Auto Click", "🖱️", 10)
+text(acTab, "Auto Click com Bolinha", 20, THEME.Text, Enum.Font.GothamBold)
+text(acTab, "Ativa → aparece bolinha pra arrastar e segurar.", 12, THEME.SubText)
 
-addToggle(acTab, "🖱️ Ativar Auto Click (segurar)", false, function(v)
+addToggle(acTab, "🖱️ Ativar Auto Click (mostra bolinha)", false, function(v)
     AutoClick.Enabled = v
     if v then
-        AutoClickStart()
-        notify("🔥 Auto Click FORTE ON — segura pra clicar")
+        ACShowBubble(true)
+        notify("👆 Bolinha apareceu!")
     else
-        AutoClick.Active = false
-        AutoClickStop()
+        ACShowBubble(false)
+        AutoClick.Touching = false
+        if AutoClick.Thread then
+            task.cancel(AutoClick.Thread)
+            AutoClick.Thread = nil
+        end
         notify("🖱️ Auto Click OFF")
     end
 end)
 
-addSlider(acTab, "Cliques por segundo (CPS)", 10, AutoClick.MaxCPS, AutoClick.CPS, function(v)
+addSlider(acTab, "Cliques por segundo (CPS)", 1, 500, 30, function(v)
     AutoClick.CPS = v
 end)
 
-addButton(acTab, "🔥 MODO INSANO (CPS 500)", true, function()
+addButton(acTab, "🔥 MODO INSANO (CPS 300)", true, function()
+    AutoClick.CPS = 300
+    notify("🔥 CPS definido pra 300")
+end)
+
+addButton(acTab, "⚡ MODO TURBO (CPS 500)", false, function()
     AutoClick.CPS = 500
-    if AutoClick.Enabled then
-        AutoClickStart()
-    end
-    notify("🔥 CPS definido pra 500")
+    notify("⚡ CPS definido pra 500")
 end)
-
-addButton(acTab, "⚡ MODO TURBO (CPS 1000)", false, function()
-    AutoClick.CPS = 1000
-    if AutoClick.Enabled then
-        AutoClickStart()
-    end
-    notify("⚡ CPS definido pra 1000")
-end)
-
-text(acTab, "🔥 MODOS FORTES", 12, THEME.SubText, Enum.Font.GothamBold)
-text(acTab, "💡 Segura o botão esquerdo do mouse (ou toca na tela) pra ativar.\n💡 Solta → para de clicar.\n💡 CPS 500 = insano | CPS 1000 = turbo extremo", 12, Color3.fromRGB(250, 204, 21))
 
 -- ==========================================================
 --  ⚙️ ABA CONFIG
 -- ==========================================================
-local cfgTab = newTab("Config", "⚙️", 9)
+local cfgTab = newTab("Config", "⚙️", 11)
 text(cfgTab, "Config", 20, THEME.Text, Enum.Font.GothamBold)
-text(cfgTab, "Personalize o painel do seu jeito.", 12, THEME.SubText)
+text(cfgTab, "Personalize o painel.", 12, THEME.SubText)
 
 text(cfgTab, "🎨 COR DA INTERFACE", 12, THEME.SubText, Enum.Font.GothamBold)
 
@@ -1777,7 +2095,7 @@ end)
 selectTab("Aim")
 
 -- ==========================================================
---  🔵 BOLINHA
+--  🔵 BOLINHA DO PAINEL
 -- ==========================================================
 local bubble = make("Frame", {
     Name = "Bubble", Size = UDim2.fromOffset(BUBBLE, BUBBLE),
@@ -1949,7 +2267,8 @@ end)
 
 player.CharacterAdded:Connect(function()
     task.wait(0.5)
-    lockTarget, lockPart = nil, nil
+    lockTarget, lockPart, lockKind = nil, nil, nil
+    assistTarget, assistPart = nil, nil
     AIM_LAST_SWITCH = 0
     AIM_LOCK_START = 0
 end)
@@ -1957,5 +2276,5 @@ end)
 ESPRefreshPlayers()
 showBubble(true)
 
-print("✅ Painel Pro v3.0 — 9 abas (Aim, Speed, ESP, Noclip, Voo, Fullbright, TP, AutoClick FORTE, Config)")
-print("🔥 Auto Click: padrão 200 CPS | Máximo 1000 CPS")
+print("✅ Painel Pro v3.1 — 11 abas (Aim, Assist ✨, NPC, Speed, ESP, Noclip, Voo, Fullbright, TP, AutoClick, Config)")
+print("✨ Aim Assist: puxa suave pro inimigo, você ainda controla a mira!")
