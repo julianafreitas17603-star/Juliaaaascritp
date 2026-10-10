@@ -1,6 +1,7 @@
 -- ==========================================================
 --  💀 PAINEL PRO v3.1 — Aim 100% + Aim Assist + Aim NPC + Speed + ESP + Noclip + Voo + Fullbright + TP + AutoClick + Config
 --  ✨ NOVO: Aim Assist controlável com a mira
+--  ✅ BUG CORRIGIDO — linha travava o BindToRenderStep
 -- ==========================================================
 
 repeat task.wait(0.1) until game:IsLoaded()
@@ -591,17 +592,17 @@ local ACONFIG = {
 }
 
 -- ==========================================================
---  ✨ AIM ASSIST (NOVO — suave, controlável)
+--  ✨ AIM ASSIST (suave, controlável)
 -- ==========================================================
 local ASSIST = {
-    Enabled = false,          -- se liga, funciona quando o aim 100% está desligado
-    Strength = 0.35,          -- 0.05 (bem leve) até 1 (quase colado)
-    FOV = 90,                 -- só mira em quem tá nesse ângulo
+    Enabled = false,
+    Strength = 0.35,
+    FOV = 90,
     MaxDistance = 800,
     TeamCheck = true,
-    Prediction = false,       -- igual ao do aim principal
+    Prediction = false,
     PredictionSpeed = 400,
-    SmoothStrength = 6,       -- quantas vezes por segundo ele reajusta (mais alto = mais responsivo)
+    SmoothStrength = 6,
 }
 
 local NPC_CACHE = {}
@@ -792,7 +793,7 @@ local function GetDistToTarget()
 end
 
 -- ==========================================================
---  ✨ AIM ASSIST — função separada pra calcular alvo e aplicar
+--  ✨ AIM ASSIST — função de busca
 -- ==========================================================
 local assistTarget, assistPart = nil, nil
 
@@ -802,7 +803,6 @@ local function AssistFindTarget()
 
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= player then
-            -- team check
             local ok = true
             if ASSIST.TeamCheck then
                 local m, h = GetTeamKey(player), GetTeamKey(plr)
@@ -833,7 +833,7 @@ local function AssistFindTarget()
 end
 
 -- ==========================================================
---  UPDATE AIM UNIFICADO (100% tem prioridade, senão assist)
+--  UPDATE AIM UNIFICADO
 -- ==========================================================
 local function UpdateLock()
     local myChar = player.Character
@@ -850,11 +850,9 @@ local function UpdateLock()
     end
 
     -----------------------------------------------------------------
-    -- 🎯 MODO 1: AIM 100% (mantido intacto, prioridade máxima)
+    -- 🎯 MODO 1: AIM 100%
     -----------------------------------------------------------------
     if ACONFIG.EnabledPlayers or ACONFIG.EnabledNPCs then
-
-        -- revalida alvo atual
         if lockTarget then
             local stillOk = false
             if lockKind == "player" then
@@ -925,11 +923,11 @@ local function UpdateLock()
             end
             TryAutoFire()
         end
-        return -- se o aim 100% tá ligado, nem entra no assist
+        return
     end
 
     -----------------------------------------------------------------
-    -- ✨ MODO 2: AIM ASSIST (suave, controlável)
+    -- ✨ MODO 2: AIM ASSIST (suave)
     -----------------------------------------------------------------
     if ASSIST.Enabled then
         assistTarget, assistPart = AssistFindTarget()
@@ -943,18 +941,14 @@ local function UpdateLock()
             end
             local des = CFrame.lookAt(mp, aimPos)
 
-            -- 💡 Aplica uma fração do movimento, o resto deixa o jogador controlar
-            -- Strength = 0.05 (quase nada) até 1 (quase colado)
+            -- Aplica uma fração do movimento pro alvo
             local strength = math.clamp(ASSIST.Strength, 0, 1)
-            -- Multiplica por um fator de tempo pra ficar consistente com FPS
-            local dt = RunService.RenderStepped:Wait and 0.016 or 0.016
             local factor = math.clamp(strength * (ASSIST.SmoothStrength / 60), 0, 0.9)
             Camera.CFrame = Camera.CFrame:Lerp(des, factor)
         end
         return
     end
 
-    -- Nenhum dos dois ligados: limpa
     lockTarget, lockPart, lockKind = nil, nil, nil
     assistTarget, assistPart = nil, nil
 end
@@ -1625,11 +1619,11 @@ addSlider(aimTab, "Suavidade (0 = colado)", 0, 1, 0, function(v) ACONFIG.Smoothn
 text(aimTab, "💡 Esse é o aim 100% que você gostou. Se quiser algo mais suave, use o Aim Assist.", 12, Color3.fromRGB(250, 204, 21))
 
 -- ==========================================================
---  ✨ ABA AIM ASSIST (NOVA)
+--  ✨ ABA AIM ASSIST
 -- ==========================================================
 local assistTab = newTab("Assist", "✨", 2)
 text(assistTab, "Aim Assist (suave)", 20, THEME.Text, Enum.Font.GothamBold)
-text(assistTab, "Puxa a mira suavemente pro inimigo — você ainda controla.", 12, THEME.SubText)
+text(assistTab, "Puxa a mira suavemente pro inimigo.", 12, THEME.SubText)
 
 addToggle(assistTab, "✨ Ativar Aim Assist", false, function(v)
     ASSIST.Enabled = v
@@ -1652,7 +1646,7 @@ addSlider(assistTab, "Velocidade da bala (predição)", 50, 3000, 400, function(
 addSlider(assistTab, "Reajuste (suavidade)", 1, 30, 6, function(v) ASSIST.SmoothStrength = v end)
 
 text(assistTab, "💡 IMPORTANTE:", 12, THEME.SubText, Enum.Font.GothamBold)
-text(assistTab, "• Assist só funciona se o Aim 100% (Players/NPCs) estiver DESLIGADO.\n• Força baixa (10-30%) = você controla mais.\n• Força alta (60-100%) = quase colado, mas você ainda pode ajustar.\n• Reajuste baixo = movimento mais macio.\n• Reajuste alto = responde mais rápido.", 12, Color3.fromRGB(250, 204, 21))
+text(assistTab, "• Assist só funciona se o Aim 100% estiver DESLIGADO.\n• Força baixa (10-30%) = você controla mais.\n• Força alta (60-100%) = quase colado.\n• Reajuste baixo = mais macio.\n• Reajuste alto = responde rápido.", 12, Color3.fromRGB(250, 204, 21))
 
 -- ==========================================================
 --  👹 ABA AIM NPC
@@ -1678,7 +1672,7 @@ addButton(npcTab, "🔍 Contar NPCs no mapa", true, function()
     notify("👹 " .. #npcs .. " NPCs encontrados")
 end)
 
-text(npcTab, "💡 Se ligar junto com Aim Players, escolhe o mais próximo entre os dois.", 12, Color3.fromRGB(250, 204, 21))
+text(npcTab, "💡 Se ligar junto com Aim Players, escolhe o mais próximo.", 12, Color3.fromRGB(250, 204, 21))
 
 -- ==========================================================
 --  ⚡ ABA SPEED
@@ -2278,3 +2272,4 @@ showBubble(true)
 
 print("✅ Painel Pro v3.1 — 11 abas (Aim, Assist ✨, NPC, Speed, ESP, Noclip, Voo, Fullbright, TP, AutoClick, Config)")
 print("✨ Aim Assist: puxa suave pro inimigo, você ainda controla a mira!")
+print("🔧 Bug do RenderStepped:Wait CORRIGIDO")
