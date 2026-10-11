@@ -1,7 +1,6 @@
 -- ==========================================================
---  💀 PAINEL PRO v3.5 — Aim (mais próximo) + Assist + NPC + ESP + Speed + Noclip + Voo + TP + AutoClick + Config
---  ✅ Patch: AIM troca na hora quando o alvo morre (não cola em cadáver)
---  ✅ Fix: math.atan (ESP não trava mais)
+--  💀 PAINEL PRO v3.3 — Aim (mais próximo) + Assist + NPC + ESP + Speed + Noclip + Voo + TP + AutoClick + Config
+--  ✅ Patch: AIM escolhe SEMPRE o mais próximo + fix math.atan
 -- ==========================================================
 
 repeat task.wait(0.1) until game:IsLoaded()
@@ -585,14 +584,17 @@ local ACONFIG = {
     MaxDistance=5000, FOV=360, TeamCheck=true,
     Prediction=false, PredictionSpeed=400, Smoothness=0,
     AutoFire=false, AFCooldownMin=0.08, AFCooldownMax=0.15, AFMinDot=0.85,
-    WeightDistance=10.0,
-    WeightAngle=0.05,
-    SwitchMargin=0,
+    WeightDistance=10.0,   -- distância domina
+    WeightAngle=0.05,      -- ângulo quase não conta
+    SwitchMargin=0,        -- 0 = troca pro mais próximo na hora
     MaxLockTime=999,
     OnlyZombies=false,
     NPCTeamCheck=false,
 }
 
+-- ==========================================================
+--  ✨ AIM ASSIST
+-- ==========================================================
 local ASSIST = {
     Enabled = false, Strength = 0.35, FOV = 90, MaxDistance = 800,
     TeamCheck = true, Prediction = false, PredictionSpeed = 400, SmoothStrength = 6,
@@ -689,6 +691,9 @@ local function RefreshNPCCache()
 end
 local function GetAllNPCs() RefreshNPCCache(); return NPC_CACHE end
 
+-- ==========================================================
+--  🔑 TEAM CHECK DE NPC
+-- ==========================================================
 local NPC_TEAM_KEYWORDS = {
     ["red"]="RED",["blue"]="BLUE",["green"]="GREEN",["yellow"]="YELLOW",
     ["team1"]="T1",["team2"]="T2",["team3"]="T3",["team4"]="T4",
@@ -892,7 +897,6 @@ end
 
 -- ==========================================================
 --  🔥 UpdateLock — SEMPRE O MAIS PRÓXIMO
---  ✅ Fix: troca na hora se o alvo morrer (não cola em cadáver)
 -- ==========================================================
 local function UpdateLock()
     local myChar = player.Character
@@ -911,22 +915,8 @@ local function UpdateLock()
     -- ============ AIM PLAYERS + NPCs ============
     if ACONFIG.EnabledPlayers or ACONFIG.EnabledNPCs then
         local now = tick()
+
         local best, bestPart, _, bestDist, bestKind = FindBestTarget()
-
-        -- 🔥 CHECA SE O ALVO ATUAL AINDA TÁ VIVO
-        local curStillValid = false
-        if lockTarget then
-            if lockKind == "player" then
-                curStillValid = IsEnemy(lockTarget) and (GetPlayerPart(lockTarget) ~= nil)
-            elseif lockKind == "npc" then
-                curStillValid = (lockTarget.Parent ~= nil) and IsNPC(lockTarget) and NPCIsEnemy(lockTarget) and (NPCGetPart(lockTarget) ~= nil)
-            end
-        end
-
-        -- Se alvo morreu/saiu, descarta IMEDIATAMENTE
-        if lockTarget and not curStillValid then
-            lockTarget, lockPart, lockKind = nil, nil, nil
-        end
 
         if best and bestPart then
             local shouldSwitch = false
@@ -1416,6 +1406,7 @@ local function DrawLine2D(frame, p1, p2, color, thickness)
         return
     end
     local center = (p1 + p2) * 0.5
+    -- ✅ FIX: math.atan em vez de math.atan2
     local angle = math.deg(math.atan(diff.Y, diff.X))
     frame.Visible = true
     frame.Position = UDim2.fromOffset(center.X, center.Y)
@@ -1721,11 +1712,11 @@ connect(UserInputService.InputEnded, function(input)
 end)
 
 -- ==========================================================
---  🎯 ABA AIM
+--  🎯 ABA AIM — MAIS PRÓXIMO
 -- ==========================================================
 local aimTab = newTab("Aim", "🎯", 1)
 text(aimTab, "Aimbot Players (mais próximo)", 20, THEME.Text, Enum.Font.GothamBold)
-text(aimTab, "Trava no mais perto. Troca sozinho se outro ficar mais perto ou se o atual morrer.", 12, THEME.SubText)
+text(aimTab, "Trava no mais perto. Troca sozinho se outro ficar mais perto.", 12, THEME.SubText)
 
 addToggle(aimTab, "🎯 Ativar Aim 100% em Players", false, function(v)
     ACONFIG.EnabledPlayers = v
@@ -1744,8 +1735,12 @@ addSlider(aimTab, "FOV (graus)", 5, 360, 360, function(v) ACONFIG.FOV = v end)
 addSlider(aimTab, "Distância máx", 20, 8000, 5000, function(v) ACONFIG.MaxDistance = v end)
 addSlider(aimTab, "Velocidade da bala", 50, 3000, 400, function(v) ACONFIG.PredictionSpeed = v end)
 addSlider(aimTab, "Suavidade (0 = colado)", 0, 1, 0, function(v) ACONFIG.Smoothness = v end, 2)
-addSlider(aimTab, "Prioridade por distância", 1, 20, 10, function(v) ACONFIG.WeightDistance = v end)
-addSlider(aimTab, "Tolerância de troca (studs)", 0, 100, 0, function(v) ACONFIG.SwitchMargin = v end)
+addSlider(aimTab, "Prioridade por distância", 1, 20, 10, function(v)
+    ACONFIG.WeightDistance = v
+end)
+addSlider(aimTab, "Tolerância de troca (studs)", 0, 100, 0, function(v)
+    ACONFIG.SwitchMargin = v
+end)
 
 addButton(aimTab, "🔄 Recontar alvos agora", true, function()
     lockTarget, lockPart, lockKind = nil, nil, nil
@@ -2270,9 +2265,10 @@ player.CharacterAdded:Connect(function()
     ESPRefresh()
 end)
 
+-- Estado inicial
 ESPRefresh()
 showBubble(true)
 
-print("✅ Painel Pro v3.5 — AIM troca na hora se o alvo morrer")
-print("🎯 Nunca cola em cadáver — sempre vai pro próximo vivo")
-print("🔧 Fix: math.atan + check de alvo vivo no UpdateLock")
+print("✅ Painel Pro v3.3 — AIM escolhe SEMPRE o mais próximo")
+print("🎯 Aba AIM: prioridade por distância + tolerância de troca")
+print("🔧 Fix: math.atan (ESP não trava mais)")
