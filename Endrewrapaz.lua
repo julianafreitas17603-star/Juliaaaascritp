@@ -1,8 +1,8 @@
 -- ==========================================================
---  💀 PAINEL PRO v3.5 — Target Priority + Interface Moderna
+--  💀 PAINEL PRO v3.4 — AIM + Assist + NPC + ESP + Speed + Noclip + Voo + TP + AutoClick + Config
+--  ✅ Patch: AIM escolhe SEMPRE o mais próximo + fix math.atan
+--  ✨ Interface moderna: glass + sombras + micro-animações
 -- ==========================================================
-
-local ok, err = pcall(function()
 
 repeat task.wait(0.1) until game:IsLoaded()
 
@@ -19,6 +19,9 @@ local player    = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local Camera    = workspace.CurrentCamera
 
+-- ═══════════════════════════════════════════════════════════
+--  TEMA (modernizado)
+-- ═══════════════════════════════════════════════════════════
 local THEME = {
     Bg         = Color3.fromRGB(12, 13, 20),
     Bg2        = Color3.fromRGB(20, 22, 34),
@@ -65,9 +68,7 @@ local AnimEnabled = true
 
 local connections = {}
 local function connect(sig, fn)
-    local c = sig:Connect(fn)
-    table.insert(connections, c)
-    return c
+    local c = sig:Connect(fn); table.insert(connections, c); return c
 end
 
 local function tween(o, p, t, style, dir)
@@ -76,10 +77,12 @@ local function tween(o, p, t, style, dir)
         return nil
     end
     local tw = TweenService:Create(o, TweenInfo.new(t or 0.2, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), p)
-    tw:Play()
-    return tw
+    tw:Play(); return tw
 end
 
+-- ═══════════════════════════════════════════════════════════
+--  HELPERS
+-- ═══════════════════════════════════════════════════════════
 local function make(class, props, parent)
     local inst = Instance.new(class)
     for k, v in pairs(props) do inst[k] = v end
@@ -101,20 +104,12 @@ local function stroke(o, c, t, tr)
 end
 
 local updaters = {}
-local function themed(fn)
-    table.insert(updaters, fn)
-    fn()
-end
-
+local function themed(fn) table.insert(updaters, fn); fn() end
 local function applyTheme(a, b)
     THEME.Accent, THEME.Accent2 = a, b
     for _, fn in ipairs(updaters) do fn() end
 end
-
-local function accentSeq()
-    return ColorSequence.new(THEME.Accent, THEME.Accent2)
-end
-
+local function accentSeq() return ColorSequence.new(THEME.Accent, THEME.Accent2) end
 local function accentGradient(obj, rot)
     local g = make("UIGradient", { Rotation = rot or 0 }, obj)
     themed(function() g.Color = accentSeq() end)
@@ -122,16 +117,11 @@ local function accentGradient(obj, rot)
 end
 
 local orderN = 0
-local function order()
-    orderN = orderN + 1
-    return orderN
-end
-
+local function order() orderN += 1; return orderN end
 local function isPointer(i)
     return i.UserInputType == Enum.UserInputType.MouseButton1
         or i.UserInputType == Enum.UserInputType.Touch
 end
-
 local function isMove(i)
     return i.UserInputType == Enum.UserInputType.MouseMovement
         or i.UserInputType == Enum.UserInputType.Touch
@@ -176,6 +166,7 @@ local win = make("Frame", {
 }, root)
 local anim = make("UIScale", { Scale = 0.7 }, win)
 
+-- Sombra externa (2 camadas)
 local shadowOuter = make("Frame", {
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.new(0.5, 0, 0.5, 8),
@@ -198,6 +189,7 @@ local shadowInner = make("Frame", {
 }, win)
 round(shadowInner, 22)
 
+-- Janela principal
 local main = make("Frame", {
     Name = "Main",
     Size = UDim2.fromScale(1, 1),
@@ -231,6 +223,7 @@ TweenService:Create(
     { Rotation = 360 }
 ):Play()
 
+-- Linha de brilho no topo
 make("Frame", {
     Size = UDim2.new(1, -40, 0, 1),
     Position = UDim2.new(0.5, 0, 0, 0),
@@ -286,7 +279,7 @@ make("TextLabel", {
     BackgroundTransparency = 1,
     Position = UDim2.fromOffset(68, 36),
     Size = UDim2.new(1, -140, 0, 14),
-    Text = "v3.5  ·  Target Priority",
+    Text = "v3.4  ·  Interface Moderna",
     TextColor3 = THEME.Muted,
     TextSize = 11,
     Font = Enum.Font.GothamMedium,
@@ -319,6 +312,7 @@ minBtn.MouseLeave:Connect(function()
     tween(minBtn.UIStroke, { Transparency = 0.85 }, 0.2)
 end)
 
+-- Divisor
 make("Frame", {
     Position = UDim2.new(0.5, 0, 0, 64),
     AnchorPoint = Vector2.new(0.5, 0),
@@ -329,17 +323,14 @@ make("Frame", {
     ZIndex = 2,
 }, main)
 
+-- Drag do header
 do
     local dragging, dragStart, startPos
     top.InputBegan:Connect(function(input)
         if isPointer(input) then
-            dragging = true
-            dragStart = input.Position
-            startPos = root.Position
+            dragging = true; dragStart = input.Position; startPos = root.Position
             input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
             end)
         end
     end)
@@ -418,10 +409,10 @@ local avatarStroke = stroke(avatarWrap, THEME.Accent, 2, 0)
 themed(function() avatarStroke.Color = THEME.Accent end)
 
 task.spawn(function()
-    local ok2, img = pcall(function()
+    local ok, img = pcall(function()
         return Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
     end)
-    if ok2 then avatar.Image = img end
+    if ok then avatar.Image = img end
 end)
 
 make("TextLabel", {
@@ -449,6 +440,7 @@ make("TextLabel", {
     ZIndex = 5,
 }, profile)
 
+-- Content
 local content = make("Frame", {
     Position = UDim2.fromOffset(170, 76),
     Size = UDim2.new(1, -182, 1, -88),
@@ -556,7 +548,7 @@ local function newTab(name, icon, tabOrder)
 end
 
 -- ═══════════════════════════════════════════════════════════
---  COMPONENTES
+--  COMPONENTES DE UI
 -- ═══════════════════════════════════════════════════════════
 local function text(parent, str, size, color, font)
     return make("TextLabel", {
@@ -583,6 +575,7 @@ local function card(parent, height)
     round(c, 14)
     stroke(c, THEME.White, 1, 0.9)
 
+    -- Brilho no topo
     make("Frame", {
         Size = UDim2.new(1, -16, 0, 1),
         Position = UDim2.new(0.5, 0, 0, 0),
@@ -819,88 +812,6 @@ local function addButton(parent, label, primary, callback)
 end
 
 -- ═══════════════════════════════════════════════════════════
---  DROPDOWN
--- ═══════════════════════════════════════════════════════════
-local function addDropdown(parent, label, options, default, callback)
-    local row = card(parent, 88)
-
-    make("TextLabel", {
-        BackgroundTransparency = 1,
-        Position = UDim2.fromOffset(16, 10),
-        Size = UDim2.new(1, -32, 0, 18),
-        Text = label,
-        TextColor3 = THEME.Text,
-        TextSize = 13,
-        Font = Enum.Font.GothamMedium,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        ZIndex = 3,
-    }, row)
-
-    local initial = default or options[1]
-
-    local cycleBtn = make("TextButton", {
-        Position = UDim2.new(0, 16, 0, 40),
-        Size = UDim2.new(1, -32, 0, 34),
-        BackgroundColor3 = THEME.Off,
-        BackgroundTransparency = 0.3,
-        Text = initial,
-        TextColor3 = THEME.Text,
-        TextSize = 13,
-        Font = Enum.Font.GothamBold,
-        TextXAlignment = Enum.TextXAlignment.Center,
-        AutoButtonColor = false,
-        ZIndex = 3,
-    }, row)
-    round(cycleBtn, 10)
-
-    local cycleStroke = stroke(cycleBtn, THEME.Accent, 1, 0.6)
-    themed(function() cycleStroke.Color = THEME.Accent end)
-
-    make("TextLabel", {
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, -12, 0.5, 0),
-        Size = UDim2.fromOffset(20, 20),
-        BackgroundTransparency = 1,
-        Text = "v",
-        TextColor3 = THEME.Accent,
-        TextSize = 14,
-        Font = Enum.Font.GothamBold,
-        ZIndex = 4,
-    }, cycleBtn)
-
-    local idx = 1
-    for i = 1, #options do
-        if options[i] == initial then
-            idx = i
-            break
-        end
-    end
-
-    cycleBtn.MouseEnter:Connect(function()
-        tween(cycleBtn, { BackgroundTransparency = 0.1 }, 0.15)
-        tween(cycleStroke, { Transparency = 0.3 }, 0.15)
-    end)
-    cycleBtn.MouseLeave:Connect(function()
-        tween(cycleBtn, { BackgroundTransparency = 0.3 }, 0.15)
-        tween(cycleStroke, { Transparency = 0.6 }, 0.15)
-    end)
-
-    cycleBtn.Activated:Connect(function()
-        idx = idx + 1
-        if idx > #options then
-            idx = 1
-        end
-        cycleBtn.Text = options[idx]
-        tween(cycleBtn, { BackgroundTransparency = 0.5 }, 0.08)
-        task.delay(0.09, function()
-            tween(cycleBtn, { BackgroundTransparency = 0.3 }, 0.18)
-        end)
-        if callback then callback(options[idx]) end
-    end)
-    return row
-end
-
--- ═══════════════════════════════════════════════════════════
 --  NOTIFICAÇÃO
 -- ═══════════════════════════════════════════════════════════
 local function notify(msg)
@@ -935,7 +846,6 @@ local function notify(msg)
     }, toast)
     round(dot, 3)
     themed(function() dot.BackgroundColor3 = THEME.Accent end)
-
     TweenService:Create(
         dot,
         TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
@@ -1012,15 +922,15 @@ end
 
 local function IsAliveHumanoid(h)
     if not h or h.Health <= 0 then return false end
-    local ok3, st = pcall(function() return h:GetState() end)
-    if ok3 and st and (st == Enum.HumanoidStateType.Dead or st == Enum.HumanoidStateType.None) then
+    local ok, st = pcall(function() return h:GetState() end)
+    if ok and st and (st == Enum.HumanoidStateType.Dead or st == Enum.HumanoidStateType.None) then
         return false
     end
     return true
 end
 
 -- ═══════════════════════════════════════════════════════════
---  AIM CONFIG
+--  AIM (Players + NPCs)
 -- ═══════════════════════════════════════════════════════════
 local ACONFIG = {
     EnabledPlayers = false, EnabledNPCs = false,
@@ -1033,7 +943,6 @@ local ACONFIG = {
     MaxLockTime = 999,
     OnlyZombies = false,
     NPCTeamCheck = false,
-    TargetMode = "closest",
 }
 
 local ASSIST = {
@@ -1246,57 +1155,24 @@ local function GetPlayerPart(plr)
     return char.PrimaryPart
 end
 
--- ═══════════════════════════════════════════════════════════
---  COMPUTE SCORE
--- ═══════════════════════════════════════════════════════════
-local function ComputeScore(part, hum, mp, ml)
-    local to = part.Position - mp
-    local d = to.Magnitude
-    local ang = AngleBetween(ml, to)
-    local mode = ACONFIG.TargetMode
-
-    if mode == "crosshair" then
-        local sp, onScreen = Camera:WorldToViewportPoint(part.Position)
-        if not onScreen then return nil end
-        local vp = Camera.ViewportSize
-        local center = Vector2.new(vp.X * 0.5, vp.Y * 0.5)
-        return (Vector2.new(sp.X, sp.Y) - center).Magnitude
-    elseif mode == "lowest_hp" then
-        if not hum then return nil end
-        local hp = hum.Health / math.max(hum.MaxHealth, 1)
-        return hp * 10000 + d * 0.1
-    elseif mode == "threat" then
-        local hp = hum and (hum.Health / math.max(hum.MaxHealth, 1)) or 1
-        return d * 0.5 + ang * 5 + hp * 100
-    else
-        return d * ACONFIG.WeightDistance + ang * ACONFIG.WeightAngle
-    end
-end
-
 local function FindBestTarget()
     local mp, ml = Camera.CFrame.Position, Camera.CFrame.LookVector
     local best, bestPart, bestScore, bestDist, bestKind = nil, nil, math.huge, nil, nil
-
-    local function try(part, hum, owner, kind)
-        if not part then return end
-        local to = part.Position - mp
-        local d = to.Magnitude
-        if d > ACONFIG.MaxDistance then return end
-        local ang = AngleBetween(ml, to)
-        if ang > ACONFIG.FOV then return end
-        local score = ComputeScore(part, hum, mp, ml)
-        if score and score < bestScore then
-            bestScore, best, bestPart, bestDist, bestKind = score, owner, part, d, kind
-        end
-    end
-
     if ACONFIG.EnabledPlayers then
         for _, plr in ipairs(Players:GetPlayers()) do
             local part = GetPlayerPart(plr)
             if part then
-                local char = plr.Character
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
-                try(part, hum, plr, "player")
+                local to = part.Position - mp
+                local d = to.Magnitude
+                if d <= ACONFIG.MaxDistance then
+                    local ang = AngleBetween(ml, to)
+                    if ang <= ACONFIG.FOV then
+                        local score = d * ACONFIG.WeightDistance + ang * ACONFIG.WeightAngle
+                        if score < bestScore then
+                            bestScore, best, bestPart, bestDist, bestKind = score, plr, part, d, "player"
+                        end
+                    end
+                end
             end
         end
     end
@@ -1305,8 +1181,17 @@ local function FindBestTarget()
             if NPCIsEnemy(npc) then
                 local part = NPCGetPart(npc)
                 if part then
-                    local hum = npc:FindFirstChildOfClass("Humanoid")
-                    try(part, hum, npc, "npc")
+                    local to = part.Position - mp
+                    local d = to.Magnitude
+                    if d <= ACONFIG.MaxDistance then
+                        local ang = AngleBetween(ml, to)
+                        if ang <= ACONFIG.FOV then
+                            local score = d * ACONFIG.WeightDistance + ang * ACONFIG.WeightAngle
+                            if score < bestScore then
+                                bestScore, best, bestPart, bestDist, bestKind = score, npc, part, d, "npc"
+                            end
+                        end
+                    end
                 end
             end
         end
@@ -1323,15 +1208,15 @@ local assistTarget, assistPart = nil, nil
 
 local function AssistFindTarget()
     local mp, ml = Camera.CFrame.Position, Camera.CFrame.LookVector
-    local best, bestPart, bestScore = nil, nil, math.huge
+    local best, bestPart, bestDist = nil, nil, math.huge
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= player then
-            local ok4 = true
+            local ok = true
             if ASSIST.TeamCheck then
                 local m, h = GetTeamKey(player), GetTeamKey(plr)
-                if m and h then ok4 = (m ~= h) else ok4 = false end
+                if m and h then ok = (m ~= h) else ok = false end
             end
-            if ok4 then
+            if ok then
                 local char = plr.Character
                 local hum  = char and char:FindFirstChildOfClass("Humanoid")
                 if IsAliveHumanoid(hum) then
@@ -1344,9 +1229,8 @@ local function AssistFindTarget()
                         if d <= ASSIST.MaxDistance then
                             local ang = AngleBetween(ml, to)
                             if ang <= ASSIST.FOV then
-                                local score = ComputeScore(part, hum, mp, ml) or d
-                                if score < bestScore then
-                                    bestScore, best, bestPart = score, plr, part
+                                if d < bestDist then
+                                    bestDist, best, bestPart = d, plr, part
                                 end
                             end
                         end
@@ -1358,9 +1242,6 @@ local function AssistFindTarget()
     return best, bestPart
 end
 
--- ═══════════════════════════════════════════════════════════
---  UPDATE LOCK
--- ═══════════════════════════════════════════════════════════
 local function UpdateLock()
     local myChar = player.Character
     if not myChar then
@@ -1588,10 +1469,7 @@ end)
 
 player.CharacterAdded:Connect(function(char)
     task.wait(1)
-    if ConfigState.SpeedEnabled then
-        ApplySpeed()
-        AttachSpeedTrap()
-    end
+    if ConfigState.SpeedEnabled then ApplySpeed(); AttachSpeedTrap() end
     if ConfigState.JumpEnabled then
         local hum = char:FindFirstChildOfClass("Humanoid")
         if hum then
@@ -1692,54 +1570,34 @@ local function FullbrightApply()
     Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 140)
     Lighting.Brightness = 2
     Lighting.ClockTime = 14
-    Lighting.FogEnd = 100000
-    Lighting.FogStart = 100000
+    Lighting.FogEnd = 100000; Lighting.FogStart = 100000
     Lighting.GlobalShadows = true
     Lighting.EnvironmentDiffuseScale = 0.5
     Lighting.EnvironmentSpecularScale = 0.5
     Lighting.ExposureCompensation = 0
     for _, ef in ipairs(Lighting:GetChildren()) do
-        if ef:IsA("Atmosphere") then
-            ef.Density = 0.1
-            ef.Haze = 0
-            ef.Glare = 0
-        elseif ef:IsA("ColorCorrectionEffect") then
-            ef.Brightness = 0
-            ef.Contrast = 0
-            ef.Saturation = 0
-            ef.TintColor = Color3.fromRGB(255, 255, 255)
-        elseif ef:IsA("BloomEffect") then
-            ef.Intensity = 0
-        elseif ef:IsA("BlurEffect") then
-            ef.Size = 0
-        elseif ef:IsA("SunRaysEffect") then
-            ef.Intensity = 0
-        end
+        if ef:IsA("Atmosphere") then ef.Density = 0.1; ef.Haze = 0; ef.Glare = 0
+        elseif ef:IsA("ColorCorrectionEffect") then ef.Brightness = 0; ef.Contrast = 0; ef.Saturation = 0; ef.TintColor = Color3.fromRGB(255, 255, 255)
+        elseif ef:IsA("BloomEffect") then ef.Intensity = 0
+        elseif ef:IsA("BlurEffect") then ef.Size = 0
+        elseif ef:IsA("SunRaysEffect") then ef.Intensity = 0 end
     end
 end
 
 local function FullbrightStart()
     FullbrightApply()
-    for _, c in ipairs(FullbrightConns) do
-        if c and c.Disconnect then pcall(function() c:Disconnect() end) end
-    end
+    for _, c in ipairs(FullbrightConns) do if c and c.Disconnect then pcall(function() c:Disconnect() end) end end
     FullbrightConns = {}
     table.insert(FullbrightConns, Lighting:GetPropertyChangedSignal("ClockTime"):Connect(function()
-        if FullbrightEnabled and (Lighting.ClockTime < 10 or Lighting.ClockTime > 17) then
-            Lighting.ClockTime = 14
-        end
+        if FullbrightEnabled and (Lighting.ClockTime < 10 or Lighting.ClockTime > 17) then Lighting.ClockTime = 14 end
     end))
     table.insert(FullbrightConns, Lighting:GetPropertyChangedSignal("Brightness"):Connect(function()
-        if FullbrightEnabled and Lighting.Brightness < 1.5 then
-            Lighting.Brightness = 2
-        end
+        if FullbrightEnabled and Lighting.Brightness < 1.5 then Lighting.Brightness = 2 end
     end))
 end
 
 local function FullbrightStop()
-    for _, c in ipairs(FullbrightConns) do
-        if c and c.Disconnect then pcall(function() c:Disconnect() end) end
-    end
+    for _, c in ipairs(FullbrightConns) do if c and c.Disconnect then pcall(function() c:Disconnect() end) end end
     FullbrightConns = {}
     if FullbrightBackup then
         Lighting.Ambient = FullbrightBackup.Ambient
@@ -1754,11 +1612,7 @@ local function FullbrightStop()
         Lighting.EnvironmentSpecularScale = FullbrightBackup.EnvironmentSpecularScale
         Lighting.ExposureCompensation = FullbrightBackup.ExposureCompensation
         for ef, vals in pairs(FullbrightBackup.Effects) do
-            if ef and ef.Parent then
-                for k, v in pairs(vals) do
-                    pcall(function() ef[k] = v end)
-                end
-            end
+            if ef and ef.Parent then for k, v in pairs(vals) do pcall(function() ef[k] = v end) end end
         end
         FullbrightBackup = nil
     end
@@ -1941,8 +1795,8 @@ local function ESPUpdateDraw(draw)
     end
 
     if ESP_CONFIG.Box then
-        local ok5, cf, size = pcall(function() return char:GetBoundingBox() end)
-        if ok5 and cf then
+        local ok, cf, size = pcall(function() return char:GetBoundingBox() end)
+        if ok and cf then
             local corners = {}
             for x = -1, 1, 2 do
                 for y = -1, 1, 2 do
@@ -1959,10 +1813,8 @@ local function ESPUpdateDraw(draw)
                 local sp, on = W2S(wp)
                 if on then
                     anyOnScreen = true
-                    minX = math.min(minX, sp.X)
-                    minY = math.min(minY, sp.Y)
-                    maxX = math.max(maxX, sp.X)
-                    maxY = math.max(maxY, sp.Y)
+                    minX = math.min(minX, sp.X); minY = math.min(minY, sp.Y)
+                    maxX = math.max(maxX, sp.X); maxY = math.max(maxY, sp.Y)
                 end
             end
             if anyOnScreen then
@@ -2025,7 +1877,7 @@ end)
 
 local function ESPRefresh()
     if not ESP_CONFIG.Enabled then
-        for plr in pairs(ESP_DRAWS) do ESPRemoveDraw(plr) end
+        for plr, _ in pairs(ESP_DRAWS) do ESPRemoveDraw(plr) end
         return
     end
     for _, plr in ipairs(Players:GetPlayers()) do
@@ -2060,11 +1912,11 @@ local function ESPApplyColor(newColor)
 end
 
 local function ESPClearAll()
-    for plr in pairs(ESP_DRAWS) do ESPRemoveDraw(plr) end
+    for plr, _ in pairs(ESP_DRAWS) do ESPRemoveDraw(plr) end
 end
 
 local function ESPUpdateTeamCheck()
-    for plr in pairs(ESP_DRAWS) do
+    for plr, _ in pairs(ESP_DRAWS) do
         if not ESPIsEnemy(plr) then ESPRemoveDraw(plr) end
     end
     ESPRefresh()
@@ -2171,10 +2023,8 @@ do
     local dragging, dragStart, startPos, moved = false, nil, nil, false
     acHit.InputBegan:Connect(function(input)
         if isPointer(input) then
-            dragging = true
-            moved = false
-            dragStart = input.Position
-            startPos = acBubble.Position
+            dragging = true; moved = false
+            dragStart = input.Position; startPos = acBubble.Position
             if AutoClick.Enabled then
                 AutoClick.Touching = true
                 ACStartClickLoop()
@@ -2221,23 +2071,8 @@ end)
 
 -- AIM
 local aimTab = newTab("Aim", "🎯", 1)
-text(aimTab, "Aimbot Players", 20, THEME.Text, Enum.Font.GothamBold)
-text(aimTab, "Escolha a prioridade. O AIM troca sozinho quando o alvo morre.", 12, THEME.SubText)
-
-local AIM_MODES = { "closest", "crosshair", "lowest_hp", "threat" }
-addDropdown(aimTab, "🎯 Prioridade de alvo", AIM_MODES, ACONFIG.TargetMode, function(v)
-    ACONFIG.TargetMode = v
-    local names = {
-        closest = "Mais próximo",
-        crosshair = "Mais perto do crosshair",
-        lowest_hp = "Menor vida",
-        threat = "Maior ameaça",
-    }
-    notify("Modo: " .. (names[v] or v))
-    lockTarget, lockPart, lockKind = nil, nil, nil
-    AIM_LAST_SWITCH = 0
-    AIM_LOCK_START = 0
-end)
+text(aimTab, "Aimbot Players (mais próximo)", 20, THEME.Text, Enum.Font.GothamBold)
+text(aimTab, "Trava no mais perto. Troca sozinho se outro ficar mais perto.", 12, THEME.SubText)
 
 addToggle(aimTab, "🎯 Ativar Aim 100% em Players", false, function(v)
     ACONFIG.EnabledPlayers = v
@@ -2263,13 +2098,13 @@ addButton(aimTab, "🔄 Recontar alvos agora", true, function()
     lockTarget, lockPart, lockKind = nil, nil, nil
     AIM_LAST_SWITCH = 0
     AIM_LOCK_START = 0
-    notify("🔄 Vai reescolher no próximo frame")
+    notify("🔄 Vai escolher o mais próximo no próximo frame")
 end)
 
 -- ASSIST
 local assistTab = newTab("Assist", "✨", 2)
 text(assistTab, "Aim Assist (suave)", 20, THEME.Text, Enum.Font.GothamBold)
-text(assistTab, "Puxa a mira suavemente. Usa a mesma prioridade do AIM.", 12, THEME.SubText)
+text(assistTab, "Puxa a mira suavemente.", 12, THEME.SubText)
 
 addToggle(assistTab, "✨ Ativar Aim Assist", false, function(v)
     ASSIST.Enabled = v
@@ -2283,7 +2118,7 @@ addSlider(assistTab, "FOV", 5, 360, 90, function(v) ASSIST.FOV = v end)
 addSlider(assistTab, "Distância máx", 50, 5000, 800, function(v) ASSIST.MaxDistance = v end)
 addSlider(assistTab, "Reajuste (suavidade)", 1, 30, 6, function(v) ASSIST.SmoothStrength = v end)
 
--- NPC
+-- AIM NPC
 local npcTab = newTab("Aim NPC", "👹", 3)
 text(npcTab, "Aimbot NPCs", 20, THEME.Text, Enum.Font.GothamBold)
 text(npcTab, "Cola em NPCs / zumbis / bonecos.", 12, THEME.SubText)
@@ -2332,10 +2167,7 @@ addToggle(spdTab, "⚡ Ativar Speed", false, function(v)
             AttachSpeedTrap()
         else
             hum.WalkSpeed = 16
-            if SpeedPropConn then
-                SpeedPropConn:Disconnect()
-                SpeedPropConn = nil
-            end
+            if SpeedPropConn then SpeedPropConn:Disconnect() SpeedPropConn = nil end
         end
     end
     notify(v and "⚡ Speed ON" or "Speed OFF")
@@ -2365,27 +2197,18 @@ addSlider(spdTab, "Força do Pulo", 50, 500, 50, function(v)
     ConfigState.JumpValue = v
     if ConfigState.JumpEnabled then
         local hum = GetHumanoid()
-        if hum then
-            hum.UseJumpPower = true
-            hum.JumpPower = v
-        end
+        if hum then hum.UseJumpPower = true; hum.JumpPower = v end
     end
 end)
 addToggle(spdTab, "📷 FOV", false, function(v)
     ConfigState.FOVEnabled = v
     if Camera then
-        if v then
-            Camera.FieldOfView = ConfigState.FOVValue
-        else
-            Camera.FieldOfView = 70
-        end
+        if v then Camera.FieldOfView = ConfigState.FOVValue else Camera.FieldOfView = 70 end
     end
 end)
 addSlider(spdTab, "FOV da câmera", 40, 120, 70, function(v)
     ConfigState.FOVValue = v
-    if ConfigState.FOVEnabled and Camera then
-        Camera.FieldOfView = v
-    end
+    if ConfigState.FOVEnabled and Camera then Camera.FieldOfView = v end
 end)
 
 -- ESP
@@ -2420,17 +2243,13 @@ addSlider(espTab, "Tamanho do texto", 8, 24, 12, function(v)
         if d.dist then d.dist.TextSize = v end
     end
 end)
-addSlider(espTab, "Espessura das linhas", 1, 5, 1, function(v)
-    ESP_CONFIG.Thickness = v
-end)
+addSlider(espTab, "Espessura das linhas", 1, 5, 1, function(v) ESP_CONFIG.Thickness = v end)
 
 text(espTab, "🎨 COR DO ESP", 12, THEME.SubText, Enum.Font.GothamBold)
 local colorCard = card(espTab, 130)
 make("UIPadding", {
-    PaddingTop = UDim.new(0, 10),
-    PaddingLeft = UDim.new(0, 10),
-    PaddingRight = UDim.new(0, 10),
-    PaddingBottom = UDim.new(0, 10),
+    PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 10),
+    PaddingRight = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10),
 }, colorCard)
 make("UIGridLayout", {
     CellSize = UDim2.new(1/4, -6, 0, 44),
@@ -2447,15 +2266,10 @@ for i, preset in ipairs(ESP_COLORS) do
     colorStrokes[i] = sst
 
     local btn = make("TextButton", {
-        Size = UDim2.fromScale(1, 1),
-        BackgroundTransparency = 1,
-        Text = name,
-        TextColor3 = Color3.new(1, 1, 1),
-        TextStrokeTransparency = 0.3,
-        TextStrokeColor3 = Color3.new(0, 0, 0),
-        TextSize = 11,
-        Font = Enum.Font.GothamBold,
-        AutoButtonColor = false,
+        Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
+        Text = name, TextColor3 = Color3.new(1, 1, 1),
+        TextStrokeTransparency = 0.3, TextStrokeColor3 = Color3.new(0, 0, 0),
+        TextSize = 11, Font = Enum.Font.GothamBold, AutoButtonColor = false,
     }, sw)
     btn.Activated:Connect(function()
         ESPApplyColor(c)
@@ -2474,12 +2288,9 @@ text(noclipTab, "Atravessa paredes.", 12, THEME.SubText)
 addToggle(noclipTab, "🧱 Ativar Noclip", false, function(v)
     NoclipEnabled = v
     if v then
-        NoclipStart()
-        NoclipApplyToChar(player.Character)
-        notify("Noclip ON")
+        NoclipStart(); NoclipApplyToChar(player.Character); notify("Noclip ON")
     else
-        NoclipStop()
-        notify("Noclip OFF")
+        NoclipStop(); notify("Noclip OFF")
     end
 end)
 
@@ -2488,13 +2299,7 @@ local vooTab = newTab("Voo", "🚀", 7)
 text(vooTab, "Voo", 20, THEME.Text, Enum.Font.GothamBold)
 text(vooTab, "Voe livre.", 12, THEME.SubText)
 addToggle(vooTab, "🚀 Ativar Voo", false, function(v)
-    if v then
-        StartFly()
-        notify("Voo ON")
-    else
-        StopFly()
-        notify("Voo OFF")
-    end
+    if v then StartFly(); notify("Voo ON") else StopFly(); notify("Voo OFF") end
 end)
 addSlider(vooTab, "Velocidade do Voo", 20, 800, 60, function(v) FlySpeed = v end)
 
@@ -2505,11 +2310,9 @@ text(fullTab, "Clareia o mapa.", 12, THEME.SubText)
 addToggle(fullTab, "🔦 Ativar Fullbright", false, function(v)
     FullbrightEnabled = v
     if v then
-        FullbrightStart()
-        notify("Fullbright ON")
+        FullbrightStart(); notify("Fullbright ON")
     else
-        FullbrightStop()
-        notify("Fullbright OFF")
+        FullbrightStop(); notify("Fullbright OFF")
     end
 end)
 
@@ -2536,8 +2339,7 @@ local savedHeader = make("TextLabel", {
     BackgroundTransparency = 0.4,
     Text = "📍 Pontos salvos: 0",
     TextColor3 = THEME.SubText,
-    Font = Enum.Font.GothamBold,
-    TextSize = 12,
+    Font = Enum.Font.GothamBold, TextSize = 12,
     LayoutOrder = order(),
 }, tpTab)
 round(savedHeader, 10)
@@ -2555,8 +2357,7 @@ _G.RefreshTPList = function()
             BackgroundTransparency = 0.6,
             Text = "Nenhum ponto salvo ainda",
             TextColor3 = THEME.SubText,
-            Font = Enum.Font.Gotham,
-            TextSize = 12,
+            Font = Enum.Font.Gotham, TextSize = 12,
         }, savedHolder)
         round(empty, 10)
     else
@@ -2575,33 +2376,25 @@ _G.RefreshTPList = function()
                 Text = p.name,
                 TextColor3 = THEME.Text,
                 TextXAlignment = Enum.TextXAlignment.Left,
-                Font = Enum.Font.GothamMedium,
-                TextSize = 12,
+                Font = Enum.Font.GothamMedium, TextSize = 12,
             }, row)
             local irBtn = make("TextButton", {
                 Size = UDim2.fromOffset(50, 26),
                 Position = UDim2.new(1, -96, 0.5, -13),
                 BackgroundColor3 = THEME.Accent,
-                Text = "IR",
-                TextColor3 = THEME.White,
-                Font = Enum.Font.GothamBold,
-                TextSize = 12,
+                Text = "IR", TextColor3 = THEME.White,
+                Font = Enum.Font.GothamBold, TextSize = 12,
                 AutoButtonColor = false,
             }, row)
             round(irBtn, 6)
-            irBtn.Activated:Connect(function()
-                TeleportTo(p.pos)
-                notify("TP feito!")
-            end)
+            irBtn.Activated:Connect(function() TeleportTo(p.pos); notify("TP feito!") end)
 
             local delBtn = make("TextButton", {
                 Size = UDim2.fromOffset(34, 26),
                 Position = UDim2.new(1, -40, 0.5, -13),
                 BackgroundColor3 = THEME.Danger,
-                Text = "X",
-                TextColor3 = THEME.White,
-                Font = Enum.Font.GothamBold,
-                TextSize = 12,
+                Text = "X", TextColor3 = THEME.White,
+                Font = Enum.Font.GothamBold, TextSize = 12,
                 AutoButtonColor = false,
             }, row)
             round(delBtn, 6)
@@ -2622,27 +2415,17 @@ text(acTab, "Ativa → bolinha pra arrastar e segurar.", 12, THEME.SubText)
 addToggle(acTab, "🖱️ Ativar Auto Click", false, function(v)
     AutoClick.Enabled = v
     if v then
-        ACShowBubble(true)
-        notify("👆 Bolinha apareceu!")
+        ACShowBubble(true); notify("👆 Bolinha apareceu!")
     else
         ACShowBubble(false)
         AutoClick.Touching = false
-        if AutoClick.Thread then
-            pcall(task.cancel, AutoClick.Thread)
-            AutoClick.Thread = nil
-        end
+        if AutoClick.Thread then pcall(task.cancel, AutoClick.Thread); AutoClick.Thread = nil end
         notify("🖱️ Auto Click OFF")
     end
 end)
 addSlider(acTab, "CPS", 1, 500, 30, function(v) AutoClick.CPS = v end)
-addButton(acTab, "🔥 MODO INSANO (300 CPS)", true, function()
-    AutoClick.CPS = 300
-    notify("🔥 CPS 300")
-end)
-addButton(acTab, "⚡ MODO TURBO (500 CPS)", false, function()
-    AutoClick.CPS = 500
-    notify("⚡ CPS 500")
-end)
+addButton(acTab, "🔥 MODO INSANO (300 CPS)", true, function() AutoClick.CPS = 300; notify("🔥 CPS 300") end)
+addButton(acTab, "⚡ MODO TURBO (500 CPS)", false, function() AutoClick.CPS = 500; notify("⚡ CPS 500") end)
 
 -- CONFIG
 local cfgTab = newTab("Config", "⚙️", 11)
@@ -2652,10 +2435,8 @@ text(cfgTab, "Personalize o painel.", 12, THEME.SubText)
 text(cfgTab, "🎨 COR DA INTERFACE", 12, THEME.SubText, Enum.Font.GothamBold)
 local themeCard = card(cfgTab, 132)
 make("UIPadding", {
-    PaddingTop = UDim.new(0, 10),
-    PaddingLeft = UDim.new(0, 10),
-    PaddingRight = UDim.new(0, 10),
-    PaddingBottom = UDim.new(0, 10),
+    PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 10),
+    PaddingRight = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10),
 }, themeCard)
 make("UIGridLayout", {
     CellSize = UDim2.new(1/3, -6, 0, 50),
@@ -2675,10 +2456,8 @@ for i, preset in ipairs(PRESETS) do
     local btn = make("TextButton", {
         Size = UDim2.fromScale(1, 1),
         BackgroundTransparency = 1,
-        Text = name,
-        TextColor3 = THEME.White,
-        TextSize = 13,
-        Font = Enum.Font.GothamBold,
+        Text = name, TextColor3 = THEME.White,
+        TextSize = 13, Font = Enum.Font.GothamBold,
         AutoButtonColor = false,
     }, sw)
     btn.Activated:Connect(function()
@@ -2704,14 +2483,12 @@ addToggle(cfgTab, "✨ Animações", true, function(v)
     AnimEnabled = v
     notify(v and "Animações ON" or "Animações OFF")
 end)
-addToggle(cfgTab, "👤 Mostrar perfil", true, function(v)
-    profile.Visible = v
-end)
+addToggle(cfgTab, "👤 Mostrar perfil", true, function(v) profile.Visible = v end)
 
 selectTab("Aim")
 
 -- ═══════════════════════════════════════════════════════════
---  BOLINHA
+--  BOLINHA DO PAINEL
 -- ═══════════════════════════════════════════════════════════
 local bubble = make("Frame", {
     Name = "Bubble",
@@ -2898,11 +2675,7 @@ end
 connect(UserInputService.InputBegan, function(input, processed)
     if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
     if input.KeyCode == Enum.KeyCode.J or input.KeyCode == Enum.KeyCode.RightShift then
-        if isOpen then
-            minimizeWindow()
-        else
-            openWindow()
-        end
+        if isOpen then minimizeWindow() else openWindow() end
     end
 end)
 
@@ -2917,16 +2690,10 @@ player.CharacterAdded:Connect(function()
     ESPRefresh()
 end)
 
+-- Estado inicial
 ESPRefresh()
 showBubble(true)
 
-print("✅ Painel Pro v3.5 — Target Priority")
-print("🎯 Modos: closest / crosshair / lowest_hp / threat")
-print("✨ Interface moderna + dropdown estilizado")
-
-end) -- fecha o pcall externo
-
-if not ok then
-    warn("❌ ERRO Painel Pro: " .. tostring(err))
-    warn("Cole essa mensagem pro dev corrigir")
-end
+print("✅ Painel Pro v3.4 — Interface Moderna")
+print("✨ Glass + sombras + micro-animações")
+print("🎯 AIM escolhe SEMPRE o mais próximo")
