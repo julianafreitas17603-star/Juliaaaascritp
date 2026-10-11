@@ -1,6 +1,7 @@
 -- ==========================================================
---  💀 PAINEL PRO v3.4 — AIM + Assist + NPC + ESP + Speed + Noclip + Voo + TP + AutoClick + Config
---  ✅ Patch: AIM escolhe SEMPRE o mais próximo + fix math.atan
+--  💀 PAINEL PRO v3.5 — AIM + Assist + NPC + ESP + Speed + Noclip + Voo + TP + AutoClick + Config
+--  ✅ AIM escolhe SEMPRE o mais próximo + fix math.atan
+--  ✅ Prioridade de alvo configurável (closest/crosshair/lowest_hp/threat)
 --  ✨ Interface moderna: glass + sombras + micro-animações
 -- ==========================================================
 
@@ -20,7 +21,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 local Camera    = workspace.CurrentCamera
 
 -- ═══════════════════════════════════════════════════════════
---  TEMA (modernizado)
+--  TEMA
 -- ═══════════════════════════════════════════════════════════
 local THEME = {
     Bg         = Color3.fromRGB(12, 13, 20),
@@ -166,7 +167,6 @@ local win = make("Frame", {
 }, root)
 local anim = make("UIScale", { Scale = 0.7 }, win)
 
--- Sombra externa (2 camadas)
 local shadowOuter = make("Frame", {
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.new(0.5, 0, 0.5, 8),
@@ -189,7 +189,6 @@ local shadowInner = make("Frame", {
 }, win)
 round(shadowInner, 22)
 
--- Janela principal
 local main = make("Frame", {
     Name = "Main",
     Size = UDim2.fromScale(1, 1),
@@ -223,7 +222,6 @@ TweenService:Create(
     { Rotation = 360 }
 ):Play()
 
--- Linha de brilho no topo
 make("Frame", {
     Size = UDim2.new(1, -40, 0, 1),
     Position = UDim2.new(0.5, 0, 0, 0),
@@ -279,7 +277,7 @@ make("TextLabel", {
     BackgroundTransparency = 1,
     Position = UDim2.fromOffset(68, 36),
     Size = UDim2.new(1, -140, 0, 14),
-    Text = "v3.4  ·  Interface Moderna",
+    Text = "v3.5  ·  Target Priority",
     TextColor3 = THEME.Muted,
     TextSize = 11,
     Font = Enum.Font.GothamMedium,
@@ -312,7 +310,6 @@ minBtn.MouseLeave:Connect(function()
     tween(minBtn.UIStroke, { Transparency = 0.85 }, 0.2)
 end)
 
--- Divisor
 make("Frame", {
     Position = UDim2.new(0.5, 0, 0, 64),
     AnchorPoint = Vector2.new(0.5, 0),
@@ -323,7 +320,6 @@ make("Frame", {
     ZIndex = 2,
 }, main)
 
--- Drag do header
 do
     local dragging, dragStart, startPos
     top.InputBegan:Connect(function(input)
@@ -440,7 +436,6 @@ make("TextLabel", {
     ZIndex = 5,
 }, profile)
 
--- Content
 local content = make("Frame", {
     Position = UDim2.fromOffset(170, 76),
     Size = UDim2.new(1, -182, 1, -88),
@@ -575,7 +570,6 @@ local function card(parent, height)
     round(c, 14)
     stroke(c, THEME.White, 1, 0.9)
 
-    -- Brilho no topo
     make("Frame", {
         Size = UDim2.new(1, -16, 0, 1),
         Position = UDim2.new(0.5, 0, 0, 0),
@@ -812,6 +806,80 @@ local function addButton(parent, label, primary, callback)
 end
 
 -- ═══════════════════════════════════════════════════════════
+--  DROPDOWN (cycler)
+-- ═══════════════════════════════════════════════════════════
+local function addDropdown(parent, label, options, default, callback)
+    local row = card(parent, 88)
+
+    make("TextLabel", {
+        BackgroundTransparency = 1,
+        Position = UDim2.fromOffset(16, 10),
+        Size = UDim2.new(1, -32, 0, 18),
+        Text = label,
+        TextColor3 = THEME.Text,
+        TextSize = 13,
+        Font = Enum.Font.GothamMedium,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 3,
+    }, row)
+
+    local cycleBtn = make("TextButton", {
+        Position = UDim2.new(0, 16, 0, 40),
+        Size = UDim2.new(1, -32, 0, 34),
+        BackgroundColor3 = THEME.Off,
+        BackgroundTransparency = 0.3,
+        Text = default or options[1],
+        TextColor3 = THEME.Text,
+        TextSize = 13,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        AutoButtonColor = false,
+        ZIndex = 3,
+    }, row)
+    round(cycleBtn, 10)
+    local cycleStroke = stroke(cycleBtn, THEME.Accent, 1, 0.6)
+    themed(function() cycleStroke.Color = THEME.Accent end)
+
+    make("TextLabel", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, -12, 0.5, 0),
+        Size = UDim2.fromOffset(20, 20),
+        BackgroundTransparency = 1,
+        Text = "▾",
+        TextColor3 = THEME.Accent,
+        TextSize = 16,
+        Font = Enum.Font.GothamBold,
+        ZIndex = 4,
+    }, cycleBtn)
+
+    local idx = 1
+    for i, o in ipairs(options) do
+        if o == (default or options[1]) then idx = i break end
+    end
+
+    cycleBtn.MouseEnter:Connect(function()
+        tween(cycleBtn, { BackgroundTransparency = 0.1 }, 0.15)
+        tween(cycleStroke, { Transparency = 0.3 }, 0.15)
+    end)
+    cycleBtn.MouseLeave:Connect(function()
+        tween(cycleBtn, { BackgroundTransparency = 0.3 }, 0.15)
+        tween(cycleStroke, { Transparency = 0.6 }, 0.15)
+    end)
+
+    cycleBtn.Activated:Connect(function()
+        idx = idx + 1
+        if idx > #options then idx = 1 end
+        cycleBtn.Text = options[idx]
+        tween(cycleBtn, { BackgroundTransparency = 0.5 }, 0.08)
+        task.delay(0.09, function()
+            tween(cycleBtn, { BackgroundTransparency = 0.3 }, 0.18)
+        end)
+        if callback then callback(options[idx]) end
+    end)
+    return row
+end
+
+-- ═══════════════════════════════════════════════════════════
 --  NOTIFICAÇÃO
 -- ═══════════════════════════════════════════════════════════
 local function notify(msg)
@@ -930,7 +998,7 @@ local function IsAliveHumanoid(h)
 end
 
 -- ═══════════════════════════════════════════════════════════
---  AIM (Players + NPCs)
+--  AIM CONFIG
 -- ═══════════════════════════════════════════════════════════
 local ACONFIG = {
     EnabledPlayers = false, EnabledNPCs = false,
@@ -943,6 +1011,7 @@ local ACONFIG = {
     MaxLockTime = 999,
     OnlyZombies = false,
     NPCTeamCheck = false,
+    TargetMode = "closest",   -- "closest" | "crosshair" | "lowest_hp" | "threat"
 }
 
 local ASSIST = {
@@ -1155,24 +1224,58 @@ local function GetPlayerPart(plr)
     return char.PrimaryPart
 end
 
+-- ═══════════════════════════════════════════════════════════
+--  SCORE POR MODO DE PRIORIDADE
+-- ═══════════════════════════════════════════════════════════
+local function ComputeScore(part, hum, mp, ml)
+    local to = part.Position - mp
+    local d = to.Magnitude
+    local ang = AngleBetween(ml, to)
+    local mode = ACONFIG.TargetMode
+
+    if mode == "crosshair" then
+        local sp, onScreen = Camera:WorldToViewportPoint(part.Position)
+        if not onScreen then return nil end
+        local vp = Camera.ViewportSize
+        local center = Vector2.new(vp.X * 0.5, vp.Y * 0.5)
+        return (Vector2.new(sp.X, sp.Y) - center).Magnitude
+    elseif mode == "lowest_hp" then
+        if not hum then return nil end
+        local hp = hum.Health / math.max(hum.MaxHealth, 1)
+        return hp * 10000 + d * 0.1
+    elseif mode == "threat" then
+        local hp = hum and (hum.Health / math.max(hum.MaxHealth, 1)) or 1
+        return d * 0.5 + ang * 5 + hp * 100
+    else
+        -- "closest"
+        return d * ACONFIG.WeightDistance + ang * ACONFIG.WeightAngle
+    end
+end
+
 local function FindBestTarget()
     local mp, ml = Camera.CFrame.Position, Camera.CFrame.LookVector
     local best, bestPart, bestScore, bestDist, bestKind = nil, nil, math.huge, nil, nil
+
+    local function try(part, hum, owner, kind)
+        if not part then return end
+        local to = part.Position - mp
+        local d = to.Magnitude
+        if d > ACONFIG.MaxDistance then return end
+        local ang = AngleBetween(ml, to)
+        if ang > ACONFIG.FOV then return end
+        local score = ComputeScore(part, hum, mp, ml)
+        if score and score < bestScore then
+            bestScore, best, bestPart, bestDist, bestKind = score, owner, part, d, kind
+        end
+    end
+
     if ACONFIG.EnabledPlayers then
         for _, plr in ipairs(Players:GetPlayers()) do
             local part = GetPlayerPart(plr)
             if part then
-                local to = part.Position - mp
-                local d = to.Magnitude
-                if d <= ACONFIG.MaxDistance then
-                    local ang = AngleBetween(ml, to)
-                    if ang <= ACONFIG.FOV then
-                        local score = d * ACONFIG.WeightDistance + ang * ACONFIG.WeightAngle
-                        if score < bestScore then
-                            bestScore, best, bestPart, bestDist, bestKind = score, plr, part, d, "player"
-                        end
-                    end
-                end
+                local char = plr.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                try(part, hum, plr, "player")
             end
         end
     end
@@ -1181,17 +1284,8 @@ local function FindBestTarget()
             if NPCIsEnemy(npc) then
                 local part = NPCGetPart(npc)
                 if part then
-                    local to = part.Position - mp
-                    local d = to.Magnitude
-                    if d <= ACONFIG.MaxDistance then
-                        local ang = AngleBetween(ml, to)
-                        if ang <= ACONFIG.FOV then
-                            local score = d * ACONFIG.WeightDistance + ang * ACONFIG.WeightAngle
-                            if score < bestScore then
-                                bestScore, best, bestPart, bestDist, bestKind = score, npc, part, d, "npc"
-                            end
-                        end
-                    end
+                    local hum = npc:FindFirstChildOfClass("Humanoid")
+                    try(part, hum, npc, "npc")
                 end
             end
         end
@@ -1208,7 +1302,7 @@ local assistTarget, assistPart = nil, nil
 
 local function AssistFindTarget()
     local mp, ml = Camera.CFrame.Position, Camera.CFrame.LookVector
-    local best, bestPart, bestDist = nil, nil, math.huge
+    local best, bestPart, bestScore = nil, nil, math.huge
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= player then
             local ok = true
@@ -1229,8 +1323,9 @@ local function AssistFindTarget()
                         if d <= ASSIST.MaxDistance then
                             local ang = AngleBetween(ml, to)
                             if ang <= ASSIST.FOV then
-                                if d < bestDist then
-                                    bestDist, best, bestPart = d, plr, part
+                                local score = ComputeScore(part, hum, mp, ml) or d
+                                if score < bestScore then
+                                    bestScore, best, bestPart = score, plr, part
                                 end
                             end
                         end
@@ -1242,6 +1337,9 @@ local function AssistFindTarget()
     return best, bestPart
 end
 
+-- ═══════════════════════════════════════════════════════════
+--  UPDATE LOCK
+-- ═══════════════════════════════════════════════════════════
 local function UpdateLock()
     local myChar = player.Character
     if not myChar then
@@ -2066,13 +2164,30 @@ connect(UserInputService.InputEnded, function(input)
 end)
 
 -- ═══════════════════════════════════════════════════════════
---  ABAS
+--  ABA AIM
 -- ═══════════════════════════════════════════════════════════
-
--- AIM
 local aimTab = newTab("Aim", "🎯", 1)
-text(aimTab, "Aimbot Players (mais próximo)", 20, THEME.Text, Enum.Font.GothamBold)
-text(aimTab, "Trava no mais perto. Troca sozinho se outro ficar mais perto.", 12, THEME.SubText)
+text(aimTab, "Aimbot Players", 20, THEME.Text, Enum.Font.GothamBold)
+text(aimTab, "Escolha o modo de prioridade abaixo. O AIM troca sozinho quando o alvo morre.", 12, THEME.SubText)
+
+addDropdown(aimTab, "🎯 Prioridade de alvo", {
+    "closest",
+    "crosshair",
+    "lowest_hp",
+    "threat",
+}, ACONFIG.TargetMode, function(v)
+    ACONFIG.TargetMode = v
+    local nome = ({
+        closest = "🎯 Mais próximo",
+        crosshair = "🎯 Mais perto do crosshair",
+        lowest_hp = "🎯 Menor vida",
+        threat = "🎯 Maior ameaça",
+    })[v] or v
+    notify("Modo: " .. nome)
+    lockTarget, lockPart, lockKind = nil, nil, nil
+    AIM_LAST_SWITCH = 0
+    AIM_LOCK_START = 0
+end)
 
 addToggle(aimTab, "🎯 Ativar Aim 100% em Players", false, function(v)
     ACONFIG.EnabledPlayers = v
@@ -2098,13 +2213,15 @@ addButton(aimTab, "🔄 Recontar alvos agora", true, function()
     lockTarget, lockPart, lockKind = nil, nil, nil
     AIM_LAST_SWITCH = 0
     AIM_LOCK_START = 0
-    notify("🔄 Vai escolher o mais próximo no próximo frame")
+    notify("🔄 Vai reescolher no próximo frame")
 end)
 
--- ASSIST
+-- ═══════════════════════════════════════════════════════════
+--  ABA ASSIST
+-- ═══════════════════════════════════════════════════════════
 local assistTab = newTab("Assist", "✨", 2)
 text(assistTab, "Aim Assist (suave)", 20, THEME.Text, Enum.Font.GothamBold)
-text(assistTab, "Puxa a mira suavemente.", 12, THEME.SubText)
+text(assistTab, "Puxa a mira suavemente. Usa a mesma prioridade do AIM.", 12, THEME.SubText)
 
 addToggle(assistTab, "✨ Ativar Aim Assist", false, function(v)
     ASSIST.Enabled = v
@@ -2118,7 +2235,9 @@ addSlider(assistTab, "FOV", 5, 360, 90, function(v) ASSIST.FOV = v end)
 addSlider(assistTab, "Distância máx", 50, 5000, 800, function(v) ASSIST.MaxDistance = v end)
 addSlider(assistTab, "Reajuste (suavidade)", 1, 30, 6, function(v) ASSIST.SmoothStrength = v end)
 
--- AIM NPC
+-- ═══════════════════════════════════════════════════════════
+--  ABA NPC
+-- ═══════════════════════════════════════════════════════════
 local npcTab = newTab("Aim NPC", "👹", 3)
 text(npcTab, "Aimbot NPCs", 20, THEME.Text, Enum.Font.GothamBold)
 text(npcTab, "Cola em NPCs / zumbis / bonecos.", 12, THEME.SubText)
@@ -2153,7 +2272,9 @@ addButton(npcTab, "🔍 Contar NPCs", true, function()
     end
 end)
 
--- SPEED
+-- ═══════════════════════════════════════════════════════════
+--  ABA SPEED
+-- ═══════════════════════════════════════════════════════════
 local spdTab = newTab("Speed", "⚡", 4)
 text(spdTab, "Speed / Pulo / FOV", 20, THEME.Text, Enum.Font.GothamBold)
 text(spdTab, "Ajustes persistentes.", 12, THEME.SubText)
@@ -2211,7 +2332,9 @@ addSlider(spdTab, "FOV da câmera", 40, 120, 70, function(v)
     if ConfigState.FOVEnabled and Camera then Camera.FieldOfView = v end
 end)
 
--- ESP
+-- ═══════════════════════════════════════════════════════════
+--  ABA ESP
+-- ═══════════════════════════════════════════════════════════
 local espTab = newTab("ESP", "👁️", 5)
 text(espTab, "ESP Melhorado", 20, THEME.Text, Enum.Font.GothamBold)
 text(espTab, "Ative só o que quiser ver.", 12, THEME.SubText)
@@ -2281,7 +2404,9 @@ for i, preset in ipairs(ESP_COLORS) do
 end
 colorStrokes[1].Transparency = 0
 
--- NOCLIP
+-- ═══════════════════════════════════════════════════════════
+--  ABA NOCLIP
+-- ═══════════════════════════════════════════════════════════
 local noclipTab = newTab("Noclip", "🧱", 6)
 text(noclipTab, "Noclip", 20, THEME.Text, Enum.Font.GothamBold)
 text(noclipTab, "Atravessa paredes.", 12, THEME.SubText)
@@ -2294,7 +2419,9 @@ addToggle(noclipTab, "🧱 Ativar Noclip", false, function(v)
     end
 end)
 
--- VOO
+-- ═══════════════════════════════════════════════════════════
+--  ABA VOO
+-- ═══════════════════════════════════════════════════════════
 local vooTab = newTab("Voo", "🚀", 7)
 text(vooTab, "Voo", 20, THEME.Text, Enum.Font.GothamBold)
 text(vooTab, "Voe livre.", 12, THEME.SubText)
@@ -2303,7 +2430,9 @@ addToggle(vooTab, "🚀 Ativar Voo", false, function(v)
 end)
 addSlider(vooTab, "Velocidade do Voo", 20, 800, 60, function(v) FlySpeed = v end)
 
--- FULLBRIGHT
+-- ═══════════════════════════════════════════════════════════
+--  ABA FULLBRIGHT
+-- ═══════════════════════════════════════════════════════════
 local fullTab = newTab("Fullbright", "🔦", 8)
 text(fullTab, "Fullbright", 20, THEME.Text, Enum.Font.GothamBold)
 text(fullTab, "Clareia o mapa.", 12, THEME.SubText)
@@ -2316,7 +2445,9 @@ addToggle(fullTab, "🔦 Ativar Fullbright", false, function(v)
     end
 end)
 
--- TP
+-- ═══════════════════════════════════════════════════════════
+--  ABA TP
+-- ═══════════════════════════════════════════════════════════
 local tpTab = newTab("TP", "📍", 9)
 text(tpTab, "Teleportes", 20, THEME.Text, Enum.Font.GothamBold)
 text(tpTab, "Salve pontos e volte pra eles.", 12, THEME.SubText)
@@ -2408,7 +2539,9 @@ _G.RefreshTPList = function()
 end
 _G.RefreshTPList()
 
--- AUTO CLICK
+-- ═══════════════════════════════════════════════════════════
+--  ABA AUTO CLICK
+-- ═══════════════════════════════════════════════════════════
 local acTab = newTab("Auto Click", "🖱️", 10)
 text(acTab, "Auto Click com Bolinha", 20, THEME.Text, Enum.Font.GothamBold)
 text(acTab, "Ativa → bolinha pra arrastar e segurar.", 12, THEME.SubText)
@@ -2427,7 +2560,9 @@ addSlider(acTab, "CPS", 1, 500, 30, function(v) AutoClick.CPS = v end)
 addButton(acTab, "🔥 MODO INSANO (300 CPS)", true, function() AutoClick.CPS = 300; notify("🔥 CPS 300") end)
 addButton(acTab, "⚡ MODO TURBO (500 CPS)", false, function() AutoClick.CPS = 500; notify("⚡ CPS 500") end)
 
--- CONFIG
+-- ═══════════════════════════════════════════════════════════
+--  ABA CONFIG
+-- ═══════════════════════════════════════════════════════════
 local cfgTab = newTab("Config", "⚙️", 11)
 text(cfgTab, "Config", 20, THEME.Text, Enum.Font.GothamBold)
 text(cfgTab, "Personalize o painel.", 12, THEME.SubText)
@@ -2488,7 +2623,7 @@ addToggle(cfgTab, "👤 Mostrar perfil", true, function(v) profile.Visible = v e
 selectTab("Aim")
 
 -- ═══════════════════════════════════════════════════════════
---  BOLINHA DO PAINEL
+--  BOLINHA
 -- ═══════════════════════════════════════════════════════════
 local bubble = make("Frame", {
     Name = "Bubble",
@@ -2690,10 +2825,9 @@ player.CharacterAdded:Connect(function()
     ESPRefresh()
 end)
 
--- Estado inicial
 ESPRefresh()
 showBubble(true)
 
-print("✅ Painel Pro v3.4 — Interface Moderna")
-print("✨ Glass + sombras + micro-animações")
-print("🎯 AIM escolhe SEMPRE o mais próximo")
+print("✅ Painel Pro v3.5 — Target Priority")
+print("🎯 Modos: closest / crosshair / lowest_hp / threat")
+print("✨ Interface moderna + dropdown estilizado")
