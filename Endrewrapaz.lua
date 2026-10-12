@@ -1,6 +1,7 @@
 -- ==========================================================
---  💀 PAINEL PRO v3.4 — AIM + Assist + NPC + ESP + Speed + Noclip + Voo + TP + AutoClick + Config
+--  💀 PAINEL PRO v3.4.1 — AIM + Assist + NPC + ESP + Speed + Noclip + Voo + TP + AutoClick + Config
 --  ✅ Patch: AIM escolhe SEMPRE o mais próximo + fix math.atan
+--  ✅ Patch: AIM solta IMEDIATAMENTE quando alvo morre/invalida (não gruda em cadáver)
 --  ✨ Interface moderna: glass + sombras + micro-animações
 -- ==========================================================
 
@@ -279,7 +280,7 @@ make("TextLabel", {
     BackgroundTransparency = 1,
     Position = UDim2.fromOffset(68, 36),
     Size = UDim2.new(1, -140, 0, 14),
-    Text = "v3.4  ·  Interface Moderna",
+    Text = "v3.4.1  ·  Interface Moderna",
     TextColor3 = THEME.Muted,
     TextSize = 11,
     Font = Enum.Font.GothamMedium,
@@ -575,7 +576,6 @@ local function card(parent, height)
     round(c, 14)
     stroke(c, THEME.White, 1, 0.9)
 
-    -- Brilho no topo
     make("Frame", {
         Size = UDim2.new(1, -16, 0, 1),
         Position = UDim2.new(0.5, 0, 0, 0),
@@ -1242,6 +1242,32 @@ local function AssistFindTarget()
     return best, bestPart
 end
 
+-- ═══════════════════════════════════════════════════════════
+--  ✅ FIX: VALIDA SE O ALVO TRAVADO AINDA ESTÁ VIVO
+--  Solta imediatamente se morreu, saiu do jogo, virou aliado, etc.
+-- ═══════════════════════════════════════════════════════════
+local function IsLockValid()
+    if not lockTarget or not lockPart then return false end
+    if not lockPart.Parent then return false end
+
+    if lockKind == "player" then
+        if not IsEnemy(lockTarget) then return false end
+        local char = lockTarget.Character
+        if not char or not char.Parent then return false end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then return false end
+        if not lockPart:IsDescendantOf(char) then return false end
+    elseif lockKind == "npc" then
+        if not lockTarget.Parent then return false end
+        local hum = lockTarget:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then return false end
+        if not lockPart:IsDescendantOf(lockTarget) then return false end
+    else
+        return false
+    end
+    return true
+end
+
 local function UpdateLock()
     local myChar = player.Character
     if not myChar then
@@ -1257,6 +1283,11 @@ local function UpdateLock()
     end
 
     if ACONFIG.EnabledPlayers or ACONFIG.EnabledNPCs then
+        -- 🔥 FIX: Se o alvo atual morreu/saiu/invalidou, solta AGORA (antes de buscar novo)
+        if lockTarget and not IsLockValid() then
+            lockTarget, lockPart, lockKind = nil, nil, nil
+        end
+
         local now = tick()
         local best, bestPart, _, bestDist, bestKind = FindBestTarget()
 
@@ -2072,7 +2103,7 @@ end)
 -- AIM
 local aimTab = newTab("Aim", "🎯", 1)
 text(aimTab, "Aimbot Players (mais próximo)", 20, THEME.Text, Enum.Font.GothamBold)
-text(aimTab, "Trava no mais perto. Troca sozinho se outro ficar mais perto.", 12, THEME.SubText)
+text(aimTab, "Trava no mais perto. Solta na hora se o alvo morrer.", 12, THEME.SubText)
 
 addToggle(aimTab, "🎯 Ativar Aim 100% em Players", false, function(v)
     ACONFIG.EnabledPlayers = v
@@ -2694,6 +2725,6 @@ end)
 ESPRefresh()
 showBubble(true)
 
-print("✅ Painel Pro v3.4 — Interface Moderna")
+print("✅ Painel Pro v3.4.1 — Interface Moderna + AIM não gruda em cadáver")
 print("✨ Glass + sombras + micro-animações")
-print("🎯 AIM escolhe SEMPRE o mais próximo")
+print("🎯 AIM escolhe SEMPRE o mais próximo E solta na hora se o alvo morrer")
